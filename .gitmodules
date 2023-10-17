@@ -1,0 +1,3 @@
+[submodule "deps/m4ri"]
+	path = deps/m4ri
+	url = https://bitbucket.org/malb/m4ri
