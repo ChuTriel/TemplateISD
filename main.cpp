@@ -4,6 +4,9 @@
 
 int main()
 {
+    srand(time(NULL));
+    random_seed(rand());
+
     mzd_t* HT = mzd_from_str(n, n-k, h);
 	mzd_t* H = mzd_init(n-k, n);
 	mzd_transpose(H, HT);
@@ -18,7 +21,7 @@ int main()
     
      auto sp = SpecialPrange<config>(e, sRV, H, blocks);
     auto loops = sp.run();
-    std::cout << "Found after " << loops << "\n";
+    std::cout << "Found after " << loops << " loops.\n";
     mzd_print(e);
 
     return 0;
