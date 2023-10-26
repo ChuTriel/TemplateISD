@@ -16,12 +16,13 @@ int main()
 	static constexpr ConfigSpecialPrange config(n, k, w, newN, addRows);
 	auto blocks = config.parse_weight_string(eW);
 	config.print();
+    std::cout << "Parsed blocks: \n";
     for(const auto &block : blocks)
         block.print();
     
-     auto sp = SpecialPrange<config>(e, sRV, H, blocks);
+    auto sp = SpecialPrange<config>(e, sRV, H, blocks);
     auto loops = sp.run();
-    std::cout << "Found after " << loops << " loops.\n";
+    std::cout << "Found e after " << loops << " loops.\n";
     mzd_print(e);
 
     return 0;
