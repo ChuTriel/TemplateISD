@@ -1,6 +1,11 @@
 #ifndef SMALLSECRETLWE_CUSTOM_MATRIX_H
 #define SMALLSECRETLWE_CUSTOM_MATRIX_H
 
+#ifdef __APPLE__
+#include <boost/align/aligned_alloc.hpp>
+using boost::alignment::aligned_alloc;
+#endif
+
 #include "m4ri/m4ri.h"
 #include "m4ri/mzd.h"
 #include "helper.h"
@@ -662,7 +667,7 @@ size_t matrix_echelonize_partial_plusfix(mzd_t *__restrict__ M,
 					mzd_row_xor(M, i, b);
 				}
 			}
-			
+
 			// and solve it below
 			for (size_t i = b+1; i < M->nrows; ++i) {
 				if (mzd_read_bit(M, i, b)) {
@@ -872,7 +877,7 @@ size_t matrix_echelonize_partial_plusfix_opt (
 
 	//uint16_t unitpos[nkl] = {[0 ... nkl-1] = zero};
 	//uint16_t posfix [n] = {[0 ... n-1] = zero};
-	
+
 	static uint16_t unitpos[nkl];
 	static uint16_t posfix [n];
 	for (uint32_t i = 0; i < nkl; ++i) {
@@ -976,8 +981,8 @@ size_t matrix_echelonize_partial_plusfix_opt (
 #endif
 }
 
-template<const uint32_t n, 
-	const uint32_t k, 
+template<const uint32_t n,
+	const uint32_t k,
 	const uint32_t l,
 	const uint32_t c>
 size_t matrix_echelonize_partial_plusfix_opt_onlyc(
@@ -990,14 +995,14 @@ size_t matrix_echelonize_partial_plusfix_opt_onlyc(
 	constexpr uint32_t nkl  = n-k-l;
 	constexpr uint16_t zero = uint16_t(-1);
 	// constexpr uint32_t mod = k+l;
-	
+
 	// some security checks
 	static_assert(nkl >= c);
 	ASSERT(c > m4ri_k);
 
 	// create the transposed
 	mzd_transpose(AT, A);
-	
+
 	//std::vector<uint16_t> unitpos1(c, zero);
 	//std::vector<uint16_t> unitpos2(c, zero);
 	//std::vector<uint16_t> posfix  (nkl, zero);
@@ -1088,8 +1093,8 @@ size_t matrix_echelonize_partial_plusfix_opt_onlyc(
 
 	// apply the final gaussian elimination on the first coordinates
 	const uint32_t rang = matrix_echelonize_partial_opt(A, m4ri_k, c, nkl, matrix_data);
-	
-	// fix the first 
+
+	// fix the first
 	for (size_t b = rang; b < c; ++b) {
 		bool found = false;
 		// find a column where in the last row is a one
@@ -1112,17 +1117,17 @@ size_t matrix_echelonize_partial_plusfix_opt_onlyc(
 					mzd_row_xor(A, i, b);
 				}
 			}
-			
+
 			// and solve it below
 			for (size_t i = b+1; i < n-k; ++i) {
 				if (mzd_read_bit(A, i, b)) {
 					mzd_row_xor(A, i, b);
 				}
 			}
-		} 
+		}
 	}
-	
-	
+
+
 	// std::cout << unitctr << " " << nkl-unitctr << "\n";
 
 	// mzd_print(A);

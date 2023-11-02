@@ -6,7 +6,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_BUILD_TYPE Release)
 # why is the -lpng or png needed at the end (it is in the main repo, but not in the cum4ri repo..??? libm4ri.a
 # alternate names: m4ri or libm4ri.a, png or -lpng
-set(LINK_TEST_FLAGS m4ri png)
+set(LINK_TEST_FLAGS libm4ri.a png)
+link_directories("deps/m4ri/.libs")
 
 include_directories("challenges/*")
 include_directories("deps/m4ri")

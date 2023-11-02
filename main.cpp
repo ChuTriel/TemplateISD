@@ -7,7 +7,7 @@ int main()
     srand(time(NULL));
     random_seed(rand());
 
-    mzd_t* HT = mzd_from_str(n, n-k, h);
+  mzd_t* HT = mzd_from_str(n, n-k, h);
 	mzd_t* H = mzd_init(n-k, n);
 	mzd_transpose(H, HT);
 	mzd_t* sRV = mzd_from_str(1, n-k, s);
@@ -19,7 +19,7 @@ int main()
     std::cout << "Parsed blocks: \n";
     for(const auto &block : blocks)
         block.print();
-    
+
     auto sp = SpecialPrange<config>(e, sRV, H, blocks);
     auto loops = sp.run();
     std::cout << "Found e after " << loops << " loops.\n";
