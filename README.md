@@ -47,3 +47,17 @@ make prange
 ./prange
 ```
 
+## Additional Information
+
+### Main
+
+Nothing special to mention here.
+
+### Prange
+
+```bash
+./prange <nr_threads>
+```
+
+You can optionally specify the number of threads by providing it as a cli argument. If no argument is provided then the maximum possible number of threads is chosen.
+
