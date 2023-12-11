@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cstdint>
+#include "helper.h"
 #include "m4ri/m4ri.h"
 
 

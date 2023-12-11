@@ -29,4 +29,8 @@ if(OpenMP_CXX_FOUND)
     add_executable(prange prange.cpp)
     target_link_libraries(prange ${LINK_TEST_FLAGS})
     target_link_libraries(prange OpenMP::OpenMP_CXX)
+
+    add_executable(dumer dumer.cpp)
+    target_link_libraries(dumer ${LINK_TEST_FLAGS})
+    target_link_libraries(dumer OpenMP::OpenMP_CXX)
 endif()

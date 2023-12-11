@@ -16,9 +16,8 @@ int main(int argc, char* argv[])
 
     const uint32_t nr_threads = (argc == 2) ? atoi(argv[1]) : omp_get_max_threads();
     const uint32_t seed0 = time(NULL);
-    const uint32_t seed1 = rand();
-
     srand(seed0);
+    const uint32_t seed1 = rand();
     random_seed(seed1);
 
     DecodingInstance I(h, s, n, k);

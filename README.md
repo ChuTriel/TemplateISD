@@ -38,6 +38,7 @@ Valid targets are:
 | --- | --- |
 | main | Single-threaded prange (OpenMP is not required to be installed to build this target) |
 | prange | Multi-threaded prange (Requires OpenMP to be installed) |
+| dumer | Multi-threaded dumer (Requires OpenMP to be installed) |
 
 For example, if you want to build and run the multi-threaded prange variant, the whole command chain looks like this:
 ```bash
@@ -60,4 +61,12 @@ Nothing special to mention here.
 ```
 
 You can optionally specify the number of threads by providing it as a cli argument. If no argument is provided then the maximum possible number of threads is chosen.
+
+### Dumer
+
+```bash
+./dumer <nr_threads>
+```
+
+You can optionally specify the number of threads by providing it as a cli argument. If no argument is provided then the maximum possible number of threads is chosen. The parallelization is performed permutation-wise for now. Perhaps nested threading where the birthday decoding is also parallelized will be enabled in the future (using a second cli argument).
 
