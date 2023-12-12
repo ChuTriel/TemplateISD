@@ -53,5 +53,8 @@ int main(int argc, char* argv[])
 
     mzd_print(I.error);
 
+    for(int i = 0; i < nr_threads; i++)
+        delete dumers[i];
+
     return 0;
 }
