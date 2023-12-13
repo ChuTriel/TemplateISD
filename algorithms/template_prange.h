@@ -113,17 +113,17 @@ private:
 
 	// reconstructs the error vector
 	void construct_error_vector(mzp_t* perm, mzd_t* wH){
-		mzd_t* tmp = mzd_init(1, newN);
+		mzd_t* tmp = mzd_init(1, new_n);
 		int offset_error = 0, offset_syndrome = 0;
 		for(const auto &block : blocks){
 			for(int i = 0; i < block.nrColsToChoose; i++){
-				mzd_write_bit(tmp, 0,perm->values[offset_error + i], mzd_read_bit(wH, offset_syndrome+i, newN));
+				mzd_write_bit(tmp, 0,perm->values[offset_error + i], mzd_read_bit(wH, offset_syndrome+i, new_n));
 			}
 			offset_error += block.length;
 			offset_syndrome += block.nrColsToChoose;
 		}
 
-		int map[newN], b = 0;
+		int map[new_n], b = 0;
 		for(const auto &block : blocks){
 			for(int i = 0; i <  block.length; i++) {
 				map[b] = block.startIdx + i;

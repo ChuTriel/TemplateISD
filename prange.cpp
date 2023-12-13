@@ -1,6 +1,7 @@
 #include <iostream>
 #include <stdlib.h>
 //#include "challenges/mceliece/mce240sp.h"
+#include "template_prange.h"
 #include "challenges/mceliece/mce923sp.h"
 #include "template_prange.h"
 #include "instance.h"
@@ -45,12 +46,12 @@ int main(int argc, char* argv[])
         overall_loops+=loops;
     }
 
-    if(I.check()) {
+    if(I.check())
         std::cout << "Found solution after " << overall_loops << " loops" << std::endl;
-        mzd_print(I.error);
-    }
     else
         std::cout << "Something went wrong, solution not correct!\n";
+
+    mzd_print(I.error);
 
     // sequentially delete instances so mzd_free does not throw errors right and left
     for(int i = 0; i < nr_threads; i++)
