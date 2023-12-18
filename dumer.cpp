@@ -5,6 +5,7 @@
 #include "template_dumer.h"
 #include "chase_manager.h"
 #include "challenges/mceliece/mce923sp.h"
+#include "helper.h"
 
 int main(int argc, char* argv[])
 {
@@ -38,6 +39,8 @@ int main(int argc, char* argv[])
     std::cout << "Threads: " << nr_threads << "\n"; 
 
     uint64_t overall_loops = 0;
+    auto start_real = timer_start(CLOCK_REALTIME);
+    auto start_CPU = timer_start(CLOCK_PROCESS_CPUTIME_ID);
     #pragma omp parallel default(none) shared(dumers, overall_loops) num_threads(nr_threads)
     {
         auto t_id = omp_get_thread_num();
@@ -45,12 +48,19 @@ int main(int argc, char* argv[])
         #pragma omp atomic
         overall_loops += loops;
     }
+    auto elapsed_real_ns = timer_end(start_real, CLOCK_REALTIME, true);
+    auto elapsed_CPU_ns = timer_end(start_CPU, CLOCK_PROCESS_CPUTIME_ID, true);
+    double elapsed_real_s = double(elapsed_real_ns) / double(1e9);
+    double elapsed_CPU_s = double(elapsed_CPU_ns) / double(1e9);
 
     if(I.check())
         std::cout << "Found solution after " << overall_loops << " loops.\n";
     else
         std::cout << "Something went wrong! Solution not correct!\n";
 
+    // in a multithreaded scenario cpu time can exceed wall time (each thread/core counts individually)
+    std::cout << std::fixed << "Real time: " << elapsed_real_s << "s" << std::endl;
+    std::cout << std::fixed << "CPU time: " << elapsed_CPU_s << "s" << std::endl;
     mzd_print(I.error);
 
     for(int i = 0; i < nr_threads; i++)

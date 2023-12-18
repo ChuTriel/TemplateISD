@@ -4,6 +4,7 @@
 #include "template_alg.h"
 #include "custom_matrix.h"
 #include <atomic>
+#include <fstream>
 
 // Basic configuration, no additional variables are needed
 class ConfigTemplatePrange : public TemplateConfig
@@ -82,6 +83,44 @@ public:
 			}
 		}
 		return loops;
+	}
+
+	void bench_time(uint32_t iterations = 10000)
+	{
+		std::cout << "Benchmarking with " << iterations << " iterations." << std::endl << std::flush;
+		uint32_t loops = 0;
+		uint32_t rang = 0;
+		auto start = std::chrono::high_resolution_clock::now();
+		while(loops < iterations)
+		{
+			permutation_special_prange(P, wH, wHT, wHTTemp);
+			rang = matrix_echelonize_partial(wH, m4ri_k, n-k+add_rows, c_m, 0);
+			if(rang != (n-k+add_rows))
+				continue;
+			loops++;
+			if(unlikely(hamming_weight_column(wH, new_n) <= w)) {
+				bool expect = true;
+				if(!not_found.compare_exchange_strong(expect, false))
+					continue;
+
+				construct_error_vector(P, wH);
+			}
+
+		}
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
+		std::string fileName = "TemplatePrange.txt";
+		if ( access( fileName.c_str(), F_OK ) == -1 )
+		{
+			std::ofstream tmpFile(fileName);
+			tmpFile << "# n loops microsec\n";
+			tmpFile.close();
+		}
+		std::ofstream file;
+		file.open(fileName, std::ios_base::app);
+		if(file.good())
+			file << n << " " << loops << " " << duration << "\n";
+
 	}
 
 private:

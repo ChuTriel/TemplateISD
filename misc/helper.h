@@ -17,6 +17,8 @@
 //#include <concepts>     // for std::integral
 #include <type_traits>  // for std::convertable_to
 #include <cassert>
+#include <time.h>
+#include <iostream>
 
 #ifndef __CUDACC__
 #define __device__
@@ -1093,6 +1095,26 @@ static void print_binary(T a, const size_t len = sizeof(T)*8) {
 	printf("\n");
 }
 
+// some timing information in the style of wasseur https://github.com/vvasseur/isd
+// see also timer_end below
+struct timespec timer_start(clockid_t cl_id = CLOCK_REALTIME)
+{
+	struct timespec start;
+	clock_gettime(cl_id, &start);
+	return start;
+}
+
+// returns the elapsed time of either seconds (disregards remaining nanoseconds) or nanoseconds
+// depending on ns.
+uint64_t timer_end(struct timespec start, clockid_t cl_id = CLOCK_REALTIME, bool ns = false)
+{
+	struct timespec end;
+	clock_gettime(cl_id, &end);
+	uint64_t diff = end.tv_sec - start.tv_sec;
+	if (ns)
+		diff = (diff * (uint64_t)1e9) + (end.tv_nsec - start.tv_nsec);
+	return diff;
+}
 
 // static inline uint64_t cpucycles(void)
 // {
