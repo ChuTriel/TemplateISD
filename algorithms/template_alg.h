@@ -33,9 +33,12 @@ public:
 class TemplateConfig
 {
 public:
+	// enables parity-check equations as additional rows (1 row for each non-zero block)
+	const bool enable_pce = false;
+
 	const uint32_t n, k, w;
 	const uint32_t additional_rows, new_n;
-	const uint32_t m4ri_k; //careful, maybe newN and n-k+addRows
+	const uint32_t m4ri_k;
 
 	constexpr TemplateConfig(const uint32_t n,
 	                         const uint32_t k,
@@ -45,9 +48,9 @@ public:
  							n(n),
 	                        k(k),
 	                        w(w),
-	                        additional_rows(additional_rows),
+	                        additional_rows(enable_pce ? additional_rows : 0),
 	                        new_n(new_n),
-	                        m4ri_k(matrix_opt_k(n - k, MATRIX_AVX_PADDING(n)))
+	                        m4ri_k(matrix_opt_k(n - k, MATRIX_AVX_PADDING(n))) // new_n and n-k+addrows?
 	{
 
 	}
@@ -61,6 +64,7 @@ public:
 				<< ", w: " << w
 		        << ", n-k: " << n-k
 		        << ", m4ri_k: " << m4ri_k
+				<< ", enable_pce: " << enable_pce
 				<< ", add_rows: " << additional_rows
 				<< ", new_n: " << new_n
 				<< std::endl;
@@ -183,10 +187,10 @@ private:
 	{
 		ASSERT(in->ncols == (c.new_n+1)); // in = HRedCol | s
 
-		mzd_t* ret = matrix_init(c.n-c.k + blocks.size(), in->ncols);
+		mzd_t* ret = matrix_init(c.n-c.k + c.additional_rows, in->ncols);
 		mzd_copy(ret, in);
 		rci_t offset = 0;
-		for(rci_t rowCtr = 0; rowCtr < blocks.size(); rowCtr++){
+		for(rci_t rowCtr = 0; rowCtr < c.additional_rows; rowCtr++){
 			mzd_t* row = mzd_init(1, in->ncols); // all-zero init
 			auto block = blocks.at(rowCtr);
 			for(rci_t c = 0; c < block.length; c++)
