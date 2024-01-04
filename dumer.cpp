@@ -4,8 +4,9 @@
 #include "instance.h"
 #include "template_dumer.h"
 #include "chase_manager.h"
-//#include "challenges/mceliece/mce923sp.h"
-#include "challenges/mceliece/mce2197sp.h"
+#include "challenges/mceliece/mce923sp.h"
+//#include "challenges/mceliece/mce1473sp.h"
+//#include "challenges/mceliece/mce2197sp.h"
 #include "helper.h"
 
 int main(int argc, char* argv[])
@@ -24,7 +25,7 @@ int main(int argc, char* argv[])
     DecodingInstance I(h, s, n, k);
     constexpr const uint32_t p = 2;
     constexpr const uint32_t l = 16;
-    static constexpr ConfigTemplateDumer config(n, k, w, addRows, newN, p, l);
+    static constexpr ConfigTemplateDumer config(n, k, w, addRows, newN, p, l, true);
     auto B = config.parse_weight_string(eW);
     config.print();
     config.print_mem_consumption();

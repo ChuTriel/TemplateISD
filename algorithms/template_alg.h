@@ -34,7 +34,7 @@ class TemplateConfig
 {
 public:
 	// enables parity-check equations as additional rows (1 row for each non-zero block)
-	const bool enable_pce = false;
+	const bool enable_pce = true;
 
 	const uint32_t n, k, w;
 	const uint32_t additional_rows, new_n;
@@ -73,24 +73,30 @@ public:
 	// default arg should also be explicitely specified when overriding this function
 	// or: make compute_nr_cols... function protected and virtual? -> the actual parsing should be the same
 	// for each template alg. and only the number of cols chosen in each block might be different
-	[[nodiscard]] virtual std::vector<ColumnsBlock> parse_weight_string(const std::string eW = "") const
+	[[nodiscard]] virtual std::vector<ColumnsBlock> parse_weight_string(const std::string &eW) const
 	{
 		std::vector<ColumnsBlock> blocks;
+		TemplateConfig::parse_basic_blocks(blocks, eW);
+		TemplateConfig::compute_nr_nols_chosen_per_block(blocks);
+		return blocks;
+	}
+
+protected:
+
+	// should be the same in every parse_weight_string function, derived configs can use this function as
+	// the first parsing step.
+	void parse_basic_blocks(std::vector<ColumnsBlock> &blocks, const std::string &eW) const
+	{
 		for(int i = 0; i < eW.length()-1; i++)
 			if(eW.at(i) != '0')
 				blocks.emplace_back(i*32, 32, eW.at(i) - '0');
 
 		if(eW.at(eW.length()-1) != '0')
 			blocks.emplace_back(((int)eW.length()-1)*32, ((int)n%32 == 0) ? 32 : (int)n%32, eW.at(eW.length()-1) - '0');
-
-		compute_nr_nols_chosen_per_block(blocks);
-
-		return blocks;
 	}
 
-private:
-	void compute_nr_nols_chosen_per_block(std::vector<ColumnsBlock> &blocks) const {
-
+	virtual void compute_nr_nols_chosen_per_block(std::vector<ColumnsBlock> &blocks) const
+	{
 		// implicitely ordered, cannot sort a vector / array using std::sort because the ColumnsBlocks use const member...
 		std::multimap<float, ColumnsBlock&> map;
 		// calculate the number of columns to chose from each block (first round down, then correct result if necc)

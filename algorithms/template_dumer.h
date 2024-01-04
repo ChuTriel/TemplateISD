@@ -28,6 +28,9 @@ public:
 
 	const uint32_t nr_threads = 1;
 
+	// switches between standard and advanced permutation
+	const bool use_adv_perm;
+
 	constexpr ConfigTemplateDumer(const uint32_t n,
 	                              const uint32_t k,
 	                              const uint32_t w,
@@ -35,10 +38,12 @@ public:
 	                              const uint32_t new_n,
 	                              const uint32_t p,
 	                              const uint32_t l,
+								  const bool use_adv_perm = false,
 	                              const uint32_t nr_threads = 1) : TemplateConfig(n, k, w, additional_rows, new_n),
 	                                                  p(p),
 	                                                  l(l),
-	                                                                    nr_threads(nr_threads)
+													  use_adv_perm(use_adv_perm),
+	                                                  nr_threads(nr_threads)
 	{
 
 	}
@@ -57,6 +62,7 @@ public:
 		          << ", bucket_size: " << bucket_size
 		          << ", nr_top_limbs: " << nr_top_limbs
 		          << ", top_weight: " << top_weight
+				  << ", use_adv_perm: " << use_adv_perm
 		          << ", nr_threads: " << nr_threads
 		          << std::endl;
 	}
@@ -80,6 +86,55 @@ public:
 		          << std::endl;
 
 	}
+
+	[[nodiscard]] std::vector<ColumnsBlock> parse_weight_string(const std::string &eW) const override
+	{
+		std::vector<ColumnsBlock> blocks;
+		if (use_adv_perm){
+			parse_basic_blocks(blocks, eW);
+			compute_nr_nols_chosen_per_block(blocks);
+		} else {
+			blocks = TemplateConfig::parse_weight_string(eW);
+		}
+		return blocks;
+	}
+
+	protected:
+
+	void compute_nr_nols_chosen_per_block(std::vector<ColumnsBlock> &blocks) const override
+	{
+		// compute number of cols to chose from each block
+		std::multimap<float, ColumnsBlock&> map;
+		float wD = float(int(top_weight)), nkm = float(int(I_size));
+		int sum = 0;
+
+		// we must also scale the weight of each block down, use double for more accuracy?
+		float percentage_to_schale = wD / float(int(w));
+		for(auto &block : blocks){
+			float scaled_bw = float(block.weight) * percentage_to_schale;
+			float resF = ((scaled_bw / wD)*nkm);
+			int res = (int)resF;
+			block.nrColsToChoose = (res < block.weight) ? block.weight : (res > block.length ? block.length : res);
+			sum += block.nrColsToChoose;
+			map.insert(std::make_pair(resF-float(res), std::ref(block)));
+		}
+
+		while(sum < (int)I_size) // shouldnt be necessary, but to be safe if multiple iterations are needed
+		{
+			for(auto it = map.rbegin(); it != map.rend(); it++){
+				if(it->second.nrColsToChoose < it->second.length) {
+					it->second.nrColsToChoose = it->second.nrColsToChoose + 1;
+					sum++;
+				}
+				if(sum == (int)I_size)
+					break;
+			}
+		}
+		// if(sum != (int)I_size)
+		// 	std::cout << "Sum does not match I_size..why??\n";
+
+	}
+
 };
 // const important to be able to put reference "&". Otherwise config cannot be passed to class
 template<const class ConfigTemplateDumer& config>
@@ -102,9 +157,12 @@ class TemplateDumer : public TemplateBaseAlg
 	constexpr static uint32_t nr_top_limbs = config.nr_top_limbs;
 	constexpr static uint32_t top_weight = config.top_weight;
 	constexpr static uint32_t threads = config.nr_threads;
+	constexpr static bool use_adv_perm = config.use_adv_perm;
 
 	mzp_t* P;
+	mzp_t* P2;
 	mzd_t* wHT;
+	mzd_t* wHTTemp;
 	customMatrixData* c_m;
 
 	// old-style master thesis structures
@@ -123,8 +181,13 @@ public:
 	TemplateDumer(DecodingInstance& inst, const std::vector<ColumnsBlock>& blocks, uint16_t* combis =  nullptr) : TemplateBaseAlg(config, blocks, inst)
 	{
 		P = mzp_init(new_n);
+		P2 = mzp_init(new_n - I_size);
 		wHT = mzd_init(wH->ncols, wH->nrows);
 		c_m = init_matrix_data(wH->ncols);
+
+		wHTTemp = mzd_init(wHT->nrows, wHT->ncols);
+		mzd_transpose(wHT, wH);
+		mzd_copy_row(wHTTemp, new_n, wHT, new_n);
 
 		// old-style master thesis structures
 		H = mzd_init(n-k+add_rows, new_n - I_size +1);
@@ -137,7 +200,9 @@ public:
 	~TemplateDumer()
 	{
 		mzp_free(P);
+		mzp_free(P2);
 		mzd_free(wHT);
+		mzd_free(wHTTemp);
 		free_matrix_data(c_m);
 
 		mzd_free(H);
@@ -149,14 +214,25 @@ public:
 	uint64_t run()
 	{
 		uint64_t loops = 0;
-		//std::cout << "theoretical max thread count: " << omp_get_max_threads() << std::endl;
+		size_t rang = 0;
 
 		while(not_found)
 		{
+			
+			if constexpr (use_adv_perm)
+			{
+				adv_perm();
+				rang = matrix_echelonize_partial(wH, m4ri_k, I_size, c_m, 0);
+				if(rang != (I_size))
+					continue ;
+			} else
+			{
+				matrix_create_random_permutation(wH, wHT, P);
+				matrix_echelonize_partial_plusfix(wH, m4ri_k, I_size, c_m, 0, I_size, 0, P);
+			}
+			
+
 			loops++;
-			// permutation + gauss seem to work
-			matrix_create_random_permutation(wH, wHT, P);
-			matrix_echelonize_partial_plusfix(wH, m4ri_k, I_size, c_m, 0, I_size, 0, P);
 
 			mzd_submatrix(H, wH, 0, I_size, n-k+add_rows, new_n+1);
 			mzd_transpose(HT, H);
@@ -291,7 +367,10 @@ private:
 					if(!not_found.compare_exchange_strong(expect, false))
 						break;
 					//reconstruct error before permutation
-					construct_solution(STop, xTop, idx_left, idx);
+					if constexpr (use_adv_perm)
+						construct_solution_adv_perm(STop, xTop, idx_left, idx);
+					else
+						construct_solution(STop, xTop, idx_left, idx);
 				}
 			}
 		}
@@ -324,6 +403,91 @@ private:
 		mzd_free(tmp_pre_perm);
 		mzd_free(tmp_after_perm);
 	}
+
+	void construct_solution_adv_perm(const uint64_t* STop, const uint64_t* xTop, const uint64_t idx_left, const uint64_t idx_right)
+	{
+		// 1. Set "1" according to the indices
+		mzd_t* tmp_pre_perm = mzd_init(1, new_n);
+		for(uint32_t i = 0; i < nr_top_limbs; i++)
+			tmp_pre_perm->rows[0][i] = xTop[i]^STop[i];
+
+		for(uint32_t s = 0; s < p; s++)
+		{
+			uint32_t intPosLeft     = (I_size + combs[p*idx_left + s]) / 64;
+			uint32_t shiftPosLeft   = (I_size + combs[p*idx_left + s]) % 64;
+			uint32_t intPosRight    = (I_size + kl_half + combs[p*idx_right + s]) / 64;
+			uint32_t shiftPosRight  = (I_size + kl_half + combs[p*idx_right + s]) % 64;
+
+			tmp_pre_perm->rows[0][intPosLeft] ^= 1ull << shiftPosLeft;
+			tmp_pre_perm->rows[0][intPosRight] ^= 1ull << shiftPosRight;
+		}
+
+		// 2. Reverse the second permutation for the right side (which is a normal permutation)
+		mzd_t* tmp_rev_sec_perm = mzd_init(1, new_n);
+		for(int i = 0; i < I_size; i++)
+			mzd_write_bit(tmp_rev_sec_perm, 0, i, mzd_read_bit(tmp_pre_perm, 0, i));
+		for(int i = 0; i < P2->length; i++)
+			mzd_write_bit(tmp_rev_sec_perm, 0, I_size + P2->values[i], mzd_read_bit(tmp_pre_perm,0,I_size+i));
+
+		// 3. Reverse first permutation ("choose x columns per block" permutation)
+		mzd_t* tmp_final = mzd_init(1, new_n);
+		int block_offset = 0, offset_id = 0, offset_rs = 0;
+		for(const auto &block : blocks){
+			for(int i = 0; i < block.nrColsToChoose; i++)
+				mzd_write_bit(tmp_final, 0, P->values[block_offset + i], mzd_read_bit(tmp_rev_sec_perm,0,offset_id + i));
+			for(int i = 0; i < block.length - block.nrColsToChoose; i++)
+				mzd_write_bit(tmp_final, 0, P->values[block_offset + block.nrColsToChoose + i], mzd_read_bit(tmp_rev_sec_perm,0,I_size + offset_rs + i));
+
+			block_offset += block.length;
+			offset_id += block.nrColsToChoose;
+			offset_rs += block.length-block.nrColsToChoose;
+		}
+
+		map_small_e_to_big_e(new_n, tmp_final);
+		mzd_free(tmp_pre_perm);
+		mzd_free(tmp_rev_sec_perm);
+		mzd_free(tmp_final);
+
+	}
+
+	void adv_perm()
+	{
+		// 1: permutation within each block to choose first nrCols from each block for the IS
+		int block_offset = 0;
+		for(const auto &block : blocks){
+			for(int i = 0; i < block.length; i++){
+				word pos =  fastrandombytes_uint64() % (block.length-i);
+				ASSERT(block_offset+i+pos < uint32_t(P->length));
+				std::swap(P->values[block_offset+i], P->values[block_offset+i+pos]);
+			}
+			block_offset+=block.length;
+		}
+
+		// 2: copy first nrCols from each block to the IS, copy the rest to the cols after identity part
+		int id_ctr = 0, after_id_ctr = 0, offset = 0;
+		for(const auto &block : blocks){
+			for(int j = 0; j < block.nrColsToChoose; j++){ // take first columns for IS
+				mzd_copy_row(wHTTemp, id_ctr, wHT, P->values[offset+j]);
+				id_ctr++;
+			}
+			for(int j = block.nrColsToChoose; j < block.length; j++){ // take the rest for right side
+				mzd_copy_row(wHTTemp, I_size + after_id_ctr, wHT, P->values[offset+j]);
+				after_id_ctr++;
+			}
+			offset += block.length;
+		}
+
+		// 3: permute columns after identity part
+		for(int i = 0; i < P2->length; i++) P2->values[i] = i; // reset important
+		for (uint32_t i = 0; i < uint32_t(P2->length-1); ++i) { // perhaps not -1?
+			word pos = fastrandombytes_uint64() % (P2->length - i);
+			ASSERT(i+pos < uint32_t(P2->length));
+			std::swap(P2->values[i], P2->values[i+pos]);
+			mzd_row_swap(wHTTemp, I_size + i, I_size+i+pos);
+		}
+		mzd_transpose(wH, wHTTemp);
+	}
+
 
 	template<typename T = uint64_t>
 	    requires std::is_integral_v<T>
