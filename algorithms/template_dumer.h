@@ -4,6 +4,7 @@
 #include "template_alg.h"
 #include "chase_manager.h"
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <bits/stdc++.h> //only gcc?
 #include <atomic>
@@ -247,15 +248,27 @@ public:
 		return loops;
 	}
 
-	void bench_time(uint32_t iterations = 10000)
+	void bench_time(uint32_t iterations = 10000, std::string file_name = "TemplateDumer.txt")
 	{
-		std::cout << "Benchmarking with " << iterations << " iterations." << std::endl << std::flush;
 		uint32_t loops = 0;
+		size_t rang = 0;
 		auto start = std::chrono::high_resolution_clock::now();
 		while(loops < iterations)
 		{
+			if constexpr (use_adv_perm)
+			{
+				adv_perm();
+				rang = matrix_echelonize_partial(wH, m4ri_k, I_size, c_m, 0);
+				if(rang != (I_size))
+					continue ;
+			} else
+			{
+				matrix_create_random_permutation(wH, wHT, P);
+				matrix_echelonize_partial_plusfix(wH, m4ri_k, I_size, c_m, 0, I_size, 0, P);
+			}
+
 			loops++;
-			// permutation + gauss seem to work
+
 			matrix_create_random_permutation(wH, wHT, P);
 			matrix_echelonize_partial_plusfix(wH, m4ri_k, I_size, c_m, 0, I_size, 0, P);
 			mzd_submatrix(H, wH, 0, I_size, n-k+add_rows, new_n+1);
@@ -269,18 +282,17 @@ public:
 		}
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
-		std::string fileName = "TemplateDumerV1.txt";
-		if ( access( fileName.c_str(), F_OK ) == -1 )
+
+		if ( access( file_name.c_str(), F_OK ) == -1 )
 		{
-			std::ofstream tmpFile(fileName);
+			std::ofstream tmpFile(file_name);
 			tmpFile << "# n loops microsec l p\n";
 			tmpFile.close();
 		}
 		std::ofstream file;
-		file.open(fileName, std::ios_base::app);
+		file.open(file_name, std::ios_base::app);
 		if(file.good())
 			file << n << " " << loops << " " << duration << " " << l << " " << p << "\n";
-
 	}
 
 private:
@@ -447,7 +459,6 @@ private:
 		mzd_free(tmp_pre_perm);
 		mzd_free(tmp_rev_sec_perm);
 		mzd_free(tmp_final);
-
 	}
 
 	void adv_perm()

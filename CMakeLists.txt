@@ -18,10 +18,10 @@ OptimizeForArchitecture()
 # list ceated in OptimizeForArchitecture
 if("avx2" IN_LIST _available_vector_units_list)
     message("-- AVX2 available, setting appropriate flags.")
-	set(AVX2_FLAGS "-DUSE_AVX2 -mavx2 -mavx -mbmi2 ")
+	set(AVX2_FLAGS "-DUSE_AVX2 -mavx2 -mavx -mbmi2")
 endif()
 
-# not needed for now
+# not needed for now (when using custom popcount implementation of crypta its necc)
 # if("avx512f" IN_LIST _available_vector_units_list)
 #     message("-- AVX512 available, setting appropriate flags.")
 #     set(AVX512_FLAGS "-DUSE_AVX512 -mavx512f -mavx512dq  -mavx512bf16 -mavx512cd  -mavx512bw -mavx512vl -mavx512vbmi -mavx512ifma -mavx512vbmi2 -mavx512vnni -mavx512bitalg -mavx512vpopcntdq")
@@ -56,4 +56,8 @@ if(OpenMP_CXX_FOUND)
     add_executable(dumer dumer.cpp)
     target_link_libraries(dumer ${LINK_TEST_FLAGS})
     target_link_libraries(dumer OpenMP::OpenMP_CXX)
+
+    add_executable(bench benchmark.cpp)
+    target_link_libraries(bench ${LINK_TEST_FLAGS})
+    target_link_libraries(bench OpenMP::OpenMP_CXX)
 endif()

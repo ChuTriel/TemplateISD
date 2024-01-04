@@ -39,6 +39,7 @@ Valid targets are:
 | main | Single-threaded prange (OpenMP is not required to be installed to build this target) |
 | prange | Multi-threaded prange (Requires OpenMP to be installed) |
 | dumer | Multi-threaded dumer (Requires OpenMP to be installed) |
+| bench | Benchmark for prange and dumer |
 
 For example, if you want to build and run the multi-threaded prange variant, the whole command chain looks like this:
 ```bash

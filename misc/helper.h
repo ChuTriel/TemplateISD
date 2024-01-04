@@ -1104,7 +1104,7 @@ struct timespec timer_start(clockid_t cl_id = CLOCK_REALTIME)
 	return start;
 }
 
-// returns the elapsed time of either seconds (disregards remaining nanoseconds) or nanoseconds
+// returns the elapsed time in either seconds (disregards remaining nanoseconds) or nanoseconds
 // depending on ns.
 uint64_t timer_end(struct timespec start, clockid_t cl_id = CLOCK_REALTIME, bool ns = false)
 {

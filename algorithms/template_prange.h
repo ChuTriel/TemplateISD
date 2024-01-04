@@ -3,8 +3,8 @@
 
 #include "template_alg.h"
 #include "custom_matrix.h"
-#include <atomic>
 #include <fstream>
+#include <atomic>
 
 // Basic configuration, no additional variables are needed
 class ConfigTemplatePrange : public TemplateConfig
@@ -85,9 +85,8 @@ public:
 		return loops;
 	}
 
-	void bench_time(uint32_t iterations = 10000)
+	void bench_time(uint32_t iterations = 10000, std::string file_name = "TemplatePrange.txt")
 	{
-		std::cout << "Benchmarking with " << iterations << " iterations." << std::endl << std::flush;
 		uint32_t loops = 0;
 		uint32_t rang = 0;
 		auto start = std::chrono::high_resolution_clock::now();
@@ -105,22 +104,21 @@ public:
 
 				construct_error_vector(P, wH);
 			}
-
 		}
+
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
-		std::string fileName = "TemplatePrange.txt";
-		if ( access( fileName.c_str(), F_OK ) == -1 )
+		
+		if ( access( file_name.c_str(), F_OK ) == -1 )
 		{
-			std::ofstream tmpFile(fileName);
+			std::ofstream tmpFile(file_name);
 			tmpFile << "# n loops microsec\n";
 			tmpFile.close();
 		}
 		std::ofstream file;
-		file.open(fileName, std::ios_base::app);
+		file.open(file_name, std::ios_base::app);
 		if(file.good())
-			file << n << " " << loops << " " << duration << "\n";
-
+			file << n << " " << iterations << " " << duration << "\n";
 	}
 
 private:
