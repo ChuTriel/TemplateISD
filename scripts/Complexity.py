@@ -1,5 +1,8 @@
 import math
 from math import log2, inf
+import collections
+from collections import OrderedDict
+from collections import defaultdict
 import random
 from Instance import * # everything, now an instance can be accessed just by typing inst156
 #import Instance # just imports the Instance module, a variable can be accessed with Instance.inst156
@@ -24,7 +27,7 @@ class ColumnsBlock:
 
 # Takes in an actual ReducedInstance from Instance.py and parses the error weight string in the same manner
 # as the c++ code. Returns a list of blocks
-def parseWeightString(inst: ReducedInstance):
+def parseWeightString(inst: ReducedInstance, pce = True):
     weightString = inst.weightDistro
     ret = []
     for i in range(len(weightString)-1):
@@ -41,7 +44,7 @@ def parseWeightString(inst: ReducedInstance):
 
     # Fancy new computation of nrColsToChose
     tupleList = []
-    nkm = inst.n - inst.k + inst.addRows
+    nkm = inst.n - inst.k + inst.addRows if pce else inst.n - inst.k
     wD = inst.w
     sum = 0
     for block in ret:
@@ -74,21 +77,28 @@ def parseWeightString(inst: ReducedInstance):
 # ------------------------ PRANGE COMPLEXITY ------------------------
 
 # Computes the number of expected permutations for prange using a standard random permutation.
-def prangeComplexityRandomPerm(cols, rows, weight, log = False):
+# If pce is True, one additional parity check equation is added
+def prangeComplexityRandomPerm2(cols, rows, weight, log = True, pce = False):
+    rows = rows + 1 if pce else rows
     combs = math.comb(cols, weight) / math.comb(rows, weight)
     ret = math.log2(combs) if log else combs
     return ret
 
-# Same as above, but takes in an Instance object.
-def prangeComplexityRandomPerm(inst: Instance, log = True):
-    combs = math.comb(inst.ncols, inst.w) / math.comb(inst.nrows, inst.w)
+# Same as above, but takes in an Instance object. If pce is True, additional parity-check
+# equations are considered. For a normale instance it is just one, for a reduced instance
+# it is the number of non-zero blocks
+def prangeComplexityRandomPerm(inst: Instance, log = True, pce = True):
+    pce_v = 0 if not pce else 1 if not inst.isReduced else inst.addRows
+    cols = inst.ncols # still reliant on the removal of 0-blocks
+    rows = inst.n - inst.k + pce_v
+    combs = math.comb(cols, inst.w) / math.comb(rows, inst.w)
     ret = math.log2(combs) if log else combs
     return ret
 
 # Computes the number of expected permutations for prange for a given actual ReducedInstance.
 # Uses a better permutation by taking the weights of the blocks into consideration. 
-def prangeComplexitySpecialPerm(inst: ReducedInstance, log = True):
-    blocks = parseWeightString(inst)
+def prangeComplexitySpecialPerm(inst: ReducedInstance, log = True, pce = True):
+    blocks = parseWeightString(inst, pce)
     exp_perm = 1.0
     for block in blocks:
         t = math.comb(block.nrCols, block.weight)
@@ -98,7 +108,6 @@ def prangeComplexitySpecialPerm(inst: ReducedInstance, log = True):
     exp_perm = log2(exp_perm) if log else math.ceil(exp_perm)
     #print(math.ceil(exp_perm))
     return exp_perm
-
 
 # ------------------------- DUMER COMPLEXITY ------------------------
 # Most of these function helper functions.
@@ -304,9 +313,12 @@ def dumer_complexity2(I: Instance, mem=inf, memory_access=0, hmap=1,
     return res
 
 # Calculated the number of expected permutations given an Instance along with the
-# optimization parameters l and p.
-def dumerComplextityRandomPerm(I: Instance, l: int, p: int, log = True):
-    Id_size = I.nrows-l
+# optimization parameters l and p. If pce = False, no parity-check equations are
+# considered.
+def dumerComplextityRandomPerm(I: Instance, l: int, p: int, log = True, pce = True):
+    pce_v = 0 if not pce else I.addRows
+    cols = I.ncols
+    Id_size = I.nrows + pce_v - l
     rs_half = math.ceil((I.ncols-Id_size)/2) #math.ceil(I.ncols - Id_size / 2)
     combs = math.ceil(  math.comb(I.ncols, I.w) / ( math.comb(Id_size, I.w - 2*p) * (math.comb(rs_half, p)**2)) )
     ret = math.log2(combs) if log else combs
@@ -365,17 +377,17 @@ def dumerMemoryConsumption(I: ReducedInstance, l: int, p: int):
 
 if __name__ == '__main__':
 
-    for k, v in MapFromNToTemplateInstance.items():
-        res2 = dumer_complexity2(v)
-        # l, p = res2["parameters"]["l"], res2["parameters"]["p"]
-        # res = dumerComplextityRandomPerm(v, l, p)
-        # resPrange = prangeComplexitySpecialPerm(v)
-        print("{}, {}".format(k, res2))
-        # print("{}, {}".format(k, res))
-        # print("{}, {}".format(k, resPrange))
-        # print(res2)
+    # for k, v in MapFromNToTemplateInstance.items():
+    #     res2 = dumer_complexity2(v)
+    #     # l, p = res2["parameters"]["l"], res2["parameters"]["p"]
+    #     # res = dumerComplextityRandomPerm(v, l, p)
+    #     # resPrange = prangeComplexitySpecialPerm(v)
+    #     print("{}, {}".format(k, res2))
+    #     # print("{}, {}".format(k, res))
+    #     # print("{}, {}".format(k, resPrange))
+    #     # print(res2)
 
-    dumerMemoryConsumption(inst2197R2, 16, 2)
+    #dumerMemoryConsumption(inst2197R2, 16, 2)
 
     #inst156.print_info()
     #print(prangeComplexityRandomPerm(inst156))
@@ -405,5 +417,10 @@ if __name__ == '__main__':
     # print(prangeComplexityRandomPerm(inst1041))
     # print(prangeComplexityRandomPerm(inst1101))
     # print(prangeComplexityRandomPerm(inst1223))
-    #prangeComplexitySpecialPerm(inst240R)
-    #prangeComplexitySpecialPerm(inst1041R)
+    # prangeComplexitySpecialPerm(inst240R)
+    # prangeComplexitySpecialPerm(inst1041R)
+
+    print(prangeComplexityRandomPerm(inst156, log = False, pce = True))
+    print(prangeComplexityRandomPerm(inst156R, log = False, pce = False))
+    print(prangeComplexitySpecialPerm(inst156R, log = False, pce = True))
+    print(prangeComplexitySpecialPerm(inst156R, log = False, pce = False))

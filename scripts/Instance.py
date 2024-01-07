@@ -4,11 +4,13 @@
 class Instance:
 
     def __init__(self, n, k, w):
+        self.isReduced = False
         self.n = n
         self.k = k
         self.w = w
         self.ncols = n
         self.nrows = n-k
+        self.addRows = 1 # 1 pce is always possible
 
     def print_info(self):
         print("n: {}, k: {}, w: {}, ncols: {}, nrows: {}".format(self.n, self.k, self.w, self.ncols, self.nrows))
@@ -17,10 +19,11 @@ class ReducedInstance(Instance):
     
     def __init__(self, n, k, w, newN, addRows, weightDistro = ""):
         Instance.__init__(self, n, k, w)
+        self.isReduced = True
         self.addRows = addRows
         self.newN = newN
         self.ncols = newN
-        self.nrows = n-k + addRows
+        self.nrows = n-k
         self.weightDistro = weightDistro
 
     def print_info(self):
