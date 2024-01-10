@@ -212,7 +212,7 @@ public:
 		mzd_free(topPart);
 	}
 
-	uint64_t run()
+	uint64_t __attribute__ ((noinline)) run() noexcept
 	{
 		uint64_t loops = 0;
 		size_t rang = 0;
