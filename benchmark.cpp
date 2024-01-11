@@ -27,7 +27,7 @@ void BENCH_PRANGE_ADVANCED_PERM()
 {
     std::cout << "Benching Prange using advanced permutation.\n";
     DecodingInstance I(h, s, n, k);
-    static constexpr ConfigTemplatePrange config(n, k, w, addRows, newN), true;
+    static constexpr ConfigTemplatePrange config(n, k, w, addRows, newN, true);
     const auto B = config.parse_weight_string(eW);
     config.print();
     TemplatePrange<config> prange(I, B);
@@ -61,6 +61,8 @@ void BENCH_DUMER_ADVANCED_PERM()
 
 int main(int argc, char* argv[])
 {
+    srand(time(NULL));
+    random_seed(rand());
     std::cout << "Instance to bench: " << n << "\n";
     BENCH_PRANGE_STANDARD_PERM();
     BENCH_PRANGE_ADVANCED_PERM();
