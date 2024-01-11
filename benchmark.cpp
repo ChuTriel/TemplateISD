@@ -4,6 +4,7 @@
 #include "instance.h"
 #include "template_prange.h"
 #include "template_dumer.h"
+#include "prange.h"
 #include "chase_manager.h"
 #include "challenges/mceliece/mce640sp.h"
 //#include "challenges/mceliece/mce808sp.h"
@@ -22,9 +23,22 @@ constexpr uint32_t l = 14;
 constexpr uint32_t p = 2;
 
 
+void BENCH_STANDARD_PRANGE()
+{
+    std::cout << "Benching Standard Prange.\n";
+
+    DecodingInstance I(h, s, n, k);
+    static constexpr ConfigPrange config(n, k, w);
+    config.print();
+    auto prange = new Prange<config>(I);
+    prange->bench_time(ITERATIONS, "StandardPrange.txt");
+    delete prange;
+}
+
 void BENCH_PRANGE_STANDARD_PERM()
 {
     std::cout << "Benching Prange using standard permutation.\n";
+
     DecodingInstance I(h, s, n, k);
     static constexpr ConfigTemplatePrange config(n, k, w, addRows, newN, false);
     const auto B = config.parse_weight_string(eW);
@@ -37,6 +51,7 @@ void BENCH_PRANGE_STANDARD_PERM()
 void BENCH_PRANGE_ADVANCED_PERM()
 {
     std::cout << "Benching Prange using advanced permutation.\n";
+
     DecodingInstance I(h, s, n, k);
     static constexpr ConfigTemplatePrange config(n, k, w, addRows, newN, true);
     const auto B = config.parse_weight_string(eW);
@@ -77,10 +92,13 @@ int main(int argc, char* argv[])
 {
     srand(time(NULL));
     random_seed(rand());
+
     std::cout << "Instance to bench: " << n << "\n";
+    BENCH_STANDARD_PRANGE();
     BENCH_PRANGE_STANDARD_PERM();
     BENCH_PRANGE_ADVANCED_PERM();
     BENCH_DUMER_STANDARD_PERM();
     BENCH_DUMER_ADVANCED_PERM();
+    
     return 0;
 }
