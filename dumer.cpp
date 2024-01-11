@@ -4,9 +4,10 @@
 #include "instance.h"
 #include "template_dumer.h"
 #include "chase_manager.h"
-#include "challenges/mceliece/mce923sp.h"
+//#include "challenges/mceliece/mce923sp.h"
 //#include "challenges/mceliece/mce1473sp.h"
 //#include "challenges/mceliece/mce2197sp.h"
+#include "challenges/mceliece/mce3488sp.h"
 #include "helper.h"
 
 int main(int argc, char* argv[])
@@ -24,7 +25,7 @@ int main(int argc, char* argv[])
 
     DecodingInstance I(h, s, n, k);
     constexpr const uint32_t p = 2;
-    constexpr const uint32_t l = 16;
+    constexpr const uint32_t l = 25;
     static constexpr ConfigTemplateDumer config(n, k, w, addRows, newN, p, l, true);
     auto B = config.parse_weight_string(eW);
     config.print();
@@ -38,7 +39,7 @@ int main(int argc, char* argv[])
     // some infos
     std::cout << "Seed0: " << seed0 << "\n";
     std::cout << "Seed1: " << seed1 << "\n";
-    std::cout << "Threads: " << nr_threads << "\n"; 
+    std::cout << "Threads: " << nr_threads << "\n";
 
     uint64_t overall_loops = 0;
     auto start_real = timer_start(CLOCK_REALTIME);
