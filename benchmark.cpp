@@ -4,7 +4,15 @@
 #include "template_dumer.h"
 #include "template_prange.h"
 #include "challenges/mceliece/mce640sp.h"
+//#include "challenges/mceliece/mce808sp.h"
+//#include "challenges/mceliece/mce982sp.h"
+//#include "challenges/mceliece/mce1101sp.h"
+//#include "challenges/mceliece/mce1223sp.h"
+//#include "challenges/mceliece/mce1473sp.h"
+//#include "challenges/mceliece/mce1665sp.h"
+//#include "challenges/mceliece/mce1995sp.h"
 //#include "challenges/mceliece/mce2197sp.h"
+//#include "challenges/mceliece/mce3488sp_random.h"
 
 // global vars for easier adjustment
 #define ITERATIONS 10000
