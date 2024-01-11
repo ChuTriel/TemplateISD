@@ -1,9 +1,11 @@
 #include <iostream>
-#include <chrono>
-#include <stdint.h>
-#include "template_dumer.h"
+#include <vector>
+#include <omp.h>
+#include "instance.h"
 #include "template_prange.h"
-//#include "challenges/mceliece/mce640sp.h"
+#include "template_dumer.h"
+#include "chase_manager.h"
+#include "challenges/mceliece/mce640sp.h"
 //#include "challenges/mceliece/mce808sp.h"
 //#include "challenges/mceliece/mce982sp.h"
 //#include "challenges/mceliece/mce1101sp.h"
@@ -12,12 +14,12 @@
 //#include "challenges/mceliece/mce1665sp.h"
 //#include "challenges/mceliece/mce1995sp.h"
 //#include "challenges/mceliece/mce2197sp.h"
-#include "challenges/mceliece/mce3488sp.h"
+//#include "challenges/mceliece/mce3488sp.h"
 
 // global vars for easier adjustment
 #define ITERATIONS 10000
-constexpr uint32_t l = 27;
-constexpr uint32_t p = 3;
+constexpr uint32_t l = 14;
+constexpr uint32_t p = 2;
 
 
 void BENCH_PRANGE_STANDARD_PERM()
@@ -27,8 +29,9 @@ void BENCH_PRANGE_STANDARD_PERM()
     static constexpr ConfigTemplatePrange config(n, k, w, addRows, newN, false);
     const auto B = config.parse_weight_string(eW);
     config.print();
-    TemplatePrange<config> prange(I, B);
-    prange.bench_time(ITERATIONS, "TemplatePrangeStandardPerm.txt");
+    auto prange = new TemplatePrange<config>(I, B);
+    prange->bench_time(ITERATIONS, "TemplatePrangeStandardPerm.txt");
+    delete prange;
 }
 
 void BENCH_PRANGE_ADVANCED_PERM()
@@ -38,8 +41,9 @@ void BENCH_PRANGE_ADVANCED_PERM()
     static constexpr ConfigTemplatePrange config(n, k, w, addRows, newN, true);
     const auto B = config.parse_weight_string(eW);
     config.print();
-    TemplatePrange<config> prange(I, B);
-    prange.bench_time(ITERATIONS, "TemplatePrangeAdvancedPerm.txt");
+    auto prange = new TemplatePrange<config>(I, B);
+    prange->bench_time(ITERATIONS, "TemplatePrangeAdvancedPerm.txt");
+    delete prange;
 }
 
 
@@ -51,8 +55,9 @@ void BENCH_DUMER_STANDARD_PERM()
     static constexpr ConfigTemplateDumer config(n, k, w, addRows, newN, p, l, false);
     const auto B = config.parse_weight_string(eW);
     config.print();
-    TemplateDumer<config> dumer(I, B);
-    dumer.bench_time(ITERATIONS, "TemplatDumerStandardPerm.txt");
+    auto dumer = new TemplateDumer<config>(I, B);
+    dumer->bench_time(ITERATIONS, "TemplatDumerStandardPerm.txt");
+    delete dumer;
 }
 
 void BENCH_DUMER_ADVANCED_PERM()
@@ -63,8 +68,9 @@ void BENCH_DUMER_ADVANCED_PERM()
     static constexpr ConfigTemplateDumer config(n, k, w, addRows, newN, p, l, true);
     const auto B = config.parse_weight_string(eW);
     config.print();
-    TemplateDumer<config> dumer(I, B);
-    dumer.bench_time(ITERATIONS, "TemplatDumerAdvancedPerm.txt");
+    auto dumer = new TemplateDumer<config>(I, B);
+    dumer->bench_time(ITERATIONS, "TemplatDumerAdvancedPerm.txt");
+    delete dumer;
 }
 
 int main(int argc, char* argv[])
