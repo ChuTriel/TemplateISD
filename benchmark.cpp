@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "template_dumer.h"
 #include "template_prange.h"
-#include "challenges/mceliece/mce640sp.h"
+//#include "challenges/mceliece/mce640sp.h"
 //#include "challenges/mceliece/mce808sp.h"
 //#include "challenges/mceliece/mce982sp.h"
 //#include "challenges/mceliece/mce1101sp.h"
@@ -12,12 +12,12 @@
 //#include "challenges/mceliece/mce1665sp.h"
 //#include "challenges/mceliece/mce1995sp.h"
 //#include "challenges/mceliece/mce2197sp.h"
-//#include "challenges/mceliece/mce3488sp_random.h"
+#include "challenges/mceliece/mce3488sp.h"
 
 // global vars for easier adjustment
 #define ITERATIONS 10000
-constexpr uint32_t l = 14;
-constexpr uint32_t p = 2;
+constexpr uint32_t l = 27;
+constexpr uint32_t p = 3;
 
 
 void BENCH_PRANGE_STANDARD_PERM()
