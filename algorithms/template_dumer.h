@@ -173,7 +173,8 @@ class TemplateDumer : public TemplateBaseAlg
 	mzd_t* topPart;
 
 	uint32_t bucket[l_table_size*bucket_size] = {0};
-	std::atomic_uint32_t counter[l_table_size];
+	//std::atomic_uint32_t counter[l_table_size];
+	uint32_t counter[l_table_size];
 	uint16_t* combs;
 
 	static std::atomic_bool not_found;
@@ -240,10 +241,12 @@ public:
 			mzd_submatrix(botPart, HT, 0, I_size, HT->nrows, n-k+add_rows);
 			mzd_submatrix(topPart, HT, 0, 0, HT->nrows, I_size);
 
-			#pragma omp parallel default(none) num_threads(threads)
-			{
-				birthday_decoding();
-			}
+			birthday_decoding();
+
+			// #pragma omp parallel default(none) num_threads(threads)
+			// {
+			// 	birthday_decoding();
+			// }
 		}
 		return loops;
 	}
@@ -275,10 +278,11 @@ public:
 			mzd_transpose(HT, H);
 			mzd_submatrix(botPart, HT, 0, I_size, HT->nrows, n-k+add_rows);
 			mzd_submatrix(topPart, HT, 0, 0, HT->nrows, I_size);
-			#pragma omp parallel default(none) num_threads(threads)
-			{
-				birthday_decoding();
-			}
+			birthday_decoding();
+			// #pragma omp parallel default(none) num_threads(threads)
+			// {
+			// 	birthday_decoding();
+			// }
 		}
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
@@ -299,14 +303,15 @@ private:
 	void birthday_decoding()
 	{
 		reset_ctr();
-		#pragma omp barrier
+		//#pragma omp barrier
 		fill_buckets();
-		#pragma omp barrier
+		//#pragma omp barrier
 		join_buckets();
 	}
 
 	void reset_ctr(){
-		for(uint32_t i = omp_get_thread_num();  i < l_table_size; i += threads)
+		//for(uint32_t idx = omp_get_thread_num(); idx < nr_combs; idx+=threads)
+		for(uint32_t i = 0;  i < l_table_size; i += threads)
 			counter[i] = 0;
 	}
 
@@ -314,7 +319,8 @@ private:
 	{
 		uint64_t syndrome = botPart->rows[new_n-I_size][0];
 		//print_bin(syndrome);
-		for(uint32_t idx = omp_get_thread_num(); idx < nr_combs; idx += threads){
+		//for(uint32_t idx = omp_get_thread_num(); idx < nr_combs; idx+=threads)
+		for(uint32_t idx = 0; idx < nr_combs; idx += threads){
 			uint64_t tmp = syndrome;
 			for(int i = 0; i < p; i++)
 				tmp ^= botPart->rows[ combs[p*idx + i] ][0];
@@ -333,7 +339,8 @@ private:
 	void join_buckets()
 	{
 		//check each combination
-		for(uint32_t idx = omp_get_thread_num(); idx < nr_combs; idx+=threads)
+		//for(uint32_t idx = omp_get_thread_num(); idx < nr_combs; idx+=threads)
+		for(uint32_t idx = 0; idx < nr_combs; idx+=threads)
 		{
 			uint32_t xLow = 0;
 			#pragma unroll
@@ -343,7 +350,8 @@ private:
 
 			//uint32_t numEleInBuckets = std::min(bucket_size, counter[xLow].load(std::memory_order_relaxed));
 			//uint32_t numEleInBuckets = (bucket_size < counter[xLow]) ? bucket_size : counter[xLow];
-			uint32_t numEleInBuckets = std::min(bucket_size, counter[xLow].load(std::memory_order_relaxed));
+			//uint32_t numEleInBuckets = std::min(bucket_size, counter[xLow].load(std::memory_order_relaxed));
+			uint32_t numEleInBuckets = std::min(bucket_size, counter[xLow]);
 			ASSERT(numEleInBuckets <= bucket_size);
 
 			// go through each match in a bucket
