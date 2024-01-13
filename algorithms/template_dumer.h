@@ -272,8 +272,6 @@ public:
 
 			loops++;
 
-			matrix_create_random_permutation(wH, wHT, P);
-			matrix_echelonize_partial_plusfix(wH, m4ri_k, I_size, c_m, 0, I_size, 0, P);
 			mzd_submatrix(H, wH, 0, I_size, n-k+add_rows, new_n+1);
 			mzd_transpose(HT, H);
 			mzd_submatrix(botPart, HT, 0, I_size, HT->nrows, n-k+add_rows);
