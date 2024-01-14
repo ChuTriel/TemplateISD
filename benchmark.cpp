@@ -17,6 +17,12 @@
 //#include "challenges/mceliece/mce2197sp.h"
 //#include "challenges/mceliece/mce3488sp.h"
 
+// #include "challenges/mceliece/mce2403sp.h"
+// #include "challenges/mceliece/mce2681sp.h"
+// #include "challenges/mceliece/mce2893sp.h"
+// #include "challenges/mceliece/mce3108sp.h"
+// #include "challenges/mceliece/mce3180sp.h"
+
 // global vars for easier adjustment
 #define ITERATIONS 10000
 constexpr uint32_t l = 14;
