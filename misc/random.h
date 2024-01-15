@@ -59,17 +59,7 @@ inline static int xorshf96_fastrandombytes_uint64_array(uint64_t *buf, size_t n)
 }
 
 static uint64_t xorshf96_fastrandombytes_uint64() {
-	constexpr uint32_t UINT64_POOL_SIZE = 512;    // page should be 512 * 8 Byte
-	static uint64_t tmp[UINT64_POOL_SIZE];
-	static size_t counter = 0;
-
-	if (counter == 0){
-		xorshf96_fastrandombytes_uint64_array(tmp, UINT64_POOL_SIZE * 8 );
-		counter = UINT64_POOL_SIZE;
-	}
-
-	counter -= 1;
-	return tmp[counter];
+	return xorshf96();
 }
 
 /*
