@@ -15,7 +15,7 @@
 //#include "challenges/mceliece/mce1473sp.h"
 //#include "challenges/mceliece/mce1665sp.h"
 //#include "challenges/mceliece/mce1995sp.h"
-#include "challenges/mceliece/mce2197sp.h"
+//#include "challenges/mceliece/mce2197sp.h"
 //#include "challenges/mceliece/mce3488sp.h"
 
 // #include "challenges/mceliece/mce2403sp.h"
@@ -23,9 +23,10 @@
 // #include "challenges/mceliece/mce2893sp.h"
 // #include "challenges/mceliece/mce3108sp.h"
 // #include "challenges/mceliece/mce3180sp.h"
+#include "challenges/mceliece/mce2062sp.h"
 
 // global vars for easier adjustment
-#define ITERATIONS 20000
+#define ITERATIONS 10000
 #define NR_THREADS 16
 constexpr uint32_t l = 16;
 constexpr uint32_t p = 2;
@@ -168,11 +169,11 @@ int main(int argc, char* argv[])
     random_seed(rand());
 
     std::cout << "Instance to bench: " << n << "\n";
-    // BENCH_STANDARD_PRANGE();
-    // BENCH_PRANGE_STANDARD_PERM();
+    BENCH_STANDARD_PRANGE();
+    BENCH_PRANGE_STANDARD_PERM();
     BENCH_PRANGE_ADVANCED_PERM();
     BENCH_PRANGE_ADVANCED_PERM_MULTI();
-    // BENCH_DUMER_STANDARD_PERM();
+    BENCH_DUMER_STANDARD_PERM();
     BENCH_DUMER_ADVANCED_PERM();
     BENCH_DUMER_ADVANCED_PERM_MULTI();
     
