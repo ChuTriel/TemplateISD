@@ -142,6 +142,8 @@ public:
 
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
+		std::cout << "Single threaded time: " << duration << std::endl;
+		std::cout << "Iterations: " << loops << std::endl;
 		
 		if ( access( file_name.c_str(), F_OK ) == -1 )
 		{
@@ -155,6 +157,39 @@ public:
 			file << n << " " << iterations << " " << duration << "\n";
 	}
 
+	uint32_t bench_perform_fixed_loops(uint32_t iterations = 10000)
+	{
+		uint32_t loops = 0;
+		uint32_t rang = 0;
+		while(loops < iterations)
+		{
+			if constexpr (use_adv_perm)
+			{
+				permutation_special_prange(P, wH, wHT, wHTTemp);
+				rang = matrix_echelonize_partial(wH, m4ri_k, n-k+add_rows, c_m, 0);
+				if(rang != (n-k+add_rows))
+					continue;
+			} else
+			{
+				matrix_create_random_permutation(wH, wHT, P);
+				matrix_echelonize_partial_plusfix(wH, m4ri_k, n-k+add_rows, c_m, 0, n-k+add_rows, 0, P);
+			}
+			loops++;
+			if(unlikely(hamming_weight_column(wH, new_n) <= w)) {
+				bool expect = true;
+				if(!not_found.compare_exchange_strong(expect, false))
+					continue;
+
+				if constexpr (use_adv_perm)
+					construct_error_vector(P, wH);
+				else
+					construct_error_vector2();
+
+			}
+		}
+		return loops;
+
+	}
 private:
 	// applies a special permutation where a precomputed number of columns of each block
 	// are chosen as the information set

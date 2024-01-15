@@ -284,6 +284,8 @@ public:
 		}
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
+		std::cout << "Single threaded time: " << duration << std::endl;
+		std::cout << "Iterations: " << loops << std::endl;
 
 		if ( access( file_name.c_str(), F_OK ) == -1 )
 		{
@@ -295,6 +297,39 @@ public:
 		file.open(file_name, std::ios_base::app);
 		if(file.good())
 			file << n << " " << loops << " " << duration << " " << l << " " << p << "\n";
+	}
+
+	uint32_t bench_perform_fixed_loops(uint32_t iterations = 10000)
+	{
+		uint32_t loops = 0;
+		size_t rang = 0;
+		while(loops < iterations)
+		{
+			if constexpr (use_adv_perm)
+			{
+				adv_perm();
+				rang = matrix_echelonize_partial(wH, m4ri_k, I_size, c_m, 0);
+				if(rang != (I_size))
+					continue ;
+			} else
+			{
+				matrix_create_random_permutation(wH, wHT, P);
+				matrix_echelonize_partial_plusfix(wH, m4ri_k, I_size, c_m, 0, I_size, 0, P);
+			}
+
+			loops++;
+
+			mzd_submatrix(H, wH, 0, I_size, n-k+add_rows, new_n+1);
+			mzd_transpose(HT, H);
+			mzd_submatrix(botPart, HT, 0, I_size, HT->nrows, n-k+add_rows);
+			mzd_submatrix(topPart, HT, 0, 0, HT->nrows, I_size);
+			birthday_decoding();
+			// #pragma omp parallel default(none) num_threads(threads)
+			// {
+			// 	birthday_decoding();
+			// }
+		}
+		return loops;
 	}
 
 private:
