@@ -6,7 +6,7 @@
 #include <fstream>
 #include <atomic>
 
-// Basic configuration, no additional variables are needed
+// Basic configuration for TemplatePrange, mostly the same as TemplateConfig
 class ConfigTemplatePrange : public TemplateConfig
 {
 public:
@@ -21,6 +21,7 @@ public:
 								  const bool use_adv_perm = true) : TemplateConfig(n, k, w, additional_rows, new_n), use_adv_perm(use_adv_perm)
 	{}
 
+	// Prints config info.
 	void print() const override
 	{
 		TemplateConfig::print();
@@ -30,10 +31,10 @@ public:
 	}
 };
 
+// Template prange algorithm. Nothing "too fancy" here.
 template<const ConfigTemplatePrange& config>
 class TemplatePrange : TemplateBaseAlg
 {
-private:
 	constexpr static uint32_t n = config.n;
 	constexpr static uint32_t k = config.k;
 	constexpr static uint32_t w = config.w;
@@ -42,13 +43,15 @@ private:
 	constexpr static uint32_t m4ri_k = config.m4ri_k;
 	constexpr static bool use_adv_perm = config.use_adv_perm;
 
-	mzp_t* P;
-	mzd_t* wHT;
-	mzd_t* wHTTemp;
-	customMatrixData* c_m;
-public:
+	mzp_t* P; // base permutation
+	mzd_t* wHT; // transposed working matrix, used as a helper variable in the permutation
+	mzd_t* wHTTemp; // helper matrix in advanced permutation to which columns are copied to
+	customMatrixData* c_m; // helper structure for gauss
+
 	static std::atomic<bool> not_found;
+
 public:
+	// Constructure that takes the instance to solve and the previously parsed blocks as the arguments.
 	TemplatePrange(DecodingInstance& I, const std::vector<ColumnsBlock>& B) : TemplateBaseAlg(config, B, I)
 	{
 		//setup own variables, also critical part for omp
@@ -75,6 +78,7 @@ public:
 		}
 	}
 
+	// Main function that executes the algorithm. Returns the number of executed loops (permutation+gauss).
 	uint64_t __attribute__ ((noinline)) run() noexcept
 	{
 		uint64_t loops = 0;
@@ -108,6 +112,8 @@ public:
 		return loops;
 	}
 
+	// Helper function to bench the runtime of the mainloop. Executes the main loop "iterations" many
+	// times and writes the runtime into the specified file.
 	void bench_time(uint32_t iterations = 10000, std::string file_name = "TemplatePrange.txt")
 	{
 		uint32_t loops = 0;
@@ -142,8 +148,6 @@ public:
 
 		auto end = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
-		std::cout << "Single threaded time: " << duration << std::endl;
-		std::cout << "Iterations: " << loops << std::endl;
 		
 		if ( access( file_name.c_str(), F_OK ) == -1 )
 		{
@@ -157,6 +161,8 @@ public:
 			file << n << " " << iterations << " " << duration << "\n";
 	}
 
+	// Helper function that executes the main loop a fixed number of iterations. Can be used to measure
+	// multi-threaded performance when class is instantiated multiple times.
 	uint32_t bench_perform_fixed_loops(uint32_t iterations = 10000)
 	{
 		uint32_t loops = 0;
@@ -191,8 +197,8 @@ public:
 
 	}
 private:
-	// applies a special permutation where a precomputed number of columns of each block
-	// are chosen as the information set
+	// Applies an advanced permutation where a precomputed number of columns of each block
+	// are chosen as the information set.
 	void permutation_special_prange(mzp_t* perm, mzd_t* wH, mzd_t* wHT, mzd_t* tmp){
 		//1: permutation
 		int block_offset = 0;
@@ -217,6 +223,7 @@ private:
 		mzd_transpose(wH, tmp);
 	}
 
+	// Reconstructs the error vector when using the standard permutation.
 	void construct_error_vector2()
 	{
 		mzd_t* tmp = mzd_init(1, new_n);
@@ -242,7 +249,7 @@ private:
 
 	}
 
-	// reconstructs the error vector when using advanced permutation
+	// Reconstructs the error vector when using the advanced permutation.
 	void construct_error_vector(mzp_t* perm, mzd_t* wH){
 		mzd_t* tmp = mzd_init(1, new_n);
 		int offset_error = 0, offset_syndrome = 0;
@@ -272,7 +279,7 @@ private:
 	}
 
 };
-// oh boi, are there better ways?
+
 template<const ConfigTemplatePrange& config>
 std::atomic<bool> TemplatePrange<config>::not_found{true};
 

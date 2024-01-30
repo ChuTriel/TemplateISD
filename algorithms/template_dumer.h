@@ -10,24 +10,27 @@
 #include <atomic>
 #include <omp.h>
 
+// Config for the template dumer algorithm, extends the basic config with additional dumer instance parameter
+// and custom algorithm parameter. This config computes necessary variables for the used 
+// "sorting algorithm /hashmap" in the the algorithm, which is in this case a simplified version of bucket sort.
 class ConfigTemplateDumer : public TemplateConfig
 {
 public:
+	// dumer specific algorithm parameter
 	const uint32_t p;
 	const uint32_t l;
 
-	const uint32_t bucket_factor = 5;
-	const uint32_t I_size = n-k+additional_rows-l; // was nkl
-	const uint32_t right_size = new_n-I_size; // mod. H without identity, was kl
+	const uint32_t bucket_factor = 5; // additional factor to scale each a bucket
+	const uint32_t I_size = n-k+additional_rows-l; // size of (one) dimension of the identity matrix
+	const uint32_t right_size = new_n-I_size; // columns modified PCM without identity part
 	const uint32_t right_size_half = right_size/2; // was kl_half
-	const uint32_t comb_half = cceil(float(right_size)/2.); // was kl_comb_half
-	const uint32_t l_table_size = 1 << l;
-	const uint32_t nr_combs = bc(comb_half, p);
-	const uint32_t bucket_size = cceil(double(nr_combs) / double(l_table_size))*bucket_factor;
+	const uint32_t comb_half = cceil(float(right_size)/2.); // length to enumerate
+	const uint32_t l_table_size = 1 << l; // number of different buckets
+	const uint32_t nr_combs = bc(comb_half, p); // number to enumerate (vectors of length comb_half with weight p)
+	const uint32_t bucket_size = cceil(double(nr_combs) / double(l_table_size))*bucket_factor; // size of each bucket
 	const uint32_t nr_top_limbs = (I_size + sizeof(uint64_t)*8 -1) / (sizeof(uint64_t)*8); // mzd words are fix uint64_t
 	const uint32_t top_weight = w - 2*p;
-
-	const uint32_t nr_threads = 1;
+	const uint32_t nr_threads = 1; // number of threads used in the birthday decoding
 
 	// switches between standard and advanced permutation
 	const bool use_adv_perm;
@@ -45,9 +48,9 @@ public:
 	                                                  l(l),
 													  use_adv_perm(use_adv_perm),
 	                                                  nr_threads(nr_threads)
-	{
+	{}
 
-	}
+	// Prints config information.
 	void print() const override
 	{
 		TemplateConfig::print();
@@ -68,7 +71,7 @@ public:
 		          << std::endl;
 	}
 
-	// TODO: adjust all types to be dynamically uint32_t or uint64_t in config and alg
+	// Prints approximate memory consumption when using parameter / computed values.
 	void print_mem_consumption() const
 	{
 		double factor = 1.0 / 1000000; // MB for now
@@ -88,6 +91,8 @@ public:
 
 	}
 
+	// Returns a vector of parsed column blocks given a specific weight distribution. The exact method of computation
+	// for the nr_cols_to_choose from each  block depends on the specified permutation (use_adv_perm).
 	[[nodiscard]] std::vector<ColumnsBlock> parse_weight_string(const std::string &eW) const override
 	{
 		std::vector<ColumnsBlock> blocks;
@@ -102,6 +107,7 @@ public:
 
 	protected:
 
+	// Method for calculating the chosen columns per block when the advanced permutation method is specified.
 	void compute_nr_nols_chosen_per_block(std::vector<ColumnsBlock> &blocks) const override
 	{
 		// compute number of cols to chose from each block
@@ -131,16 +137,17 @@ public:
 					break;
 			}
 		}
-		// if(sum != (int)I_size)
-		// 	std::cout << "Sum does not match I_size..why??\n";
-
 	}
 
 };
-// const important to be able to put reference "&". Otherwise config cannot be passed to class
+
+// Template dumer algorithm. The implemented hashmap used in the birthday decoding is a simplified version of
+// bucket sort. This algorithm can be parallized permutation-wise (creating classes in a vector). At a later date,
+// an option to also parallize the birthday decoding will (hopefully) also be implemented.
 template<const class ConfigTemplateDumer& config>
 class TemplateDumer : public TemplateBaseAlg
 {
+	// most of them are described in the config
 	constexpr static uint32_t n = config.n;
 	constexpr static uint32_t k = config.k;
 	constexpr static uint32_t w = config.w;
@@ -149,7 +156,7 @@ class TemplateDumer : public TemplateBaseAlg
 	constexpr static uint32_t m4ri_k = config.m4ri_k;
 	constexpr static uint32_t l = config.l;
 	constexpr static uint32_t p = config.p;
-	constexpr static uint32_t I_size = config.I_size; // was nkl
+	constexpr static uint32_t I_size = config.I_size; 
 	constexpr static uint64_t kl_half = config.right_size_half;
 	constexpr static uint64_t kl_combinations_half = config.comb_half;
 	constexpr static uint32_t l_table_size = config.l_table_size;
@@ -160,26 +167,28 @@ class TemplateDumer : public TemplateBaseAlg
 	constexpr static uint32_t threads = config.nr_threads;
 	constexpr static bool use_adv_perm = config.use_adv_perm;
 
-	mzp_t* P;
-	mzp_t* P2;
-	mzd_t* wHT;
-	mzd_t* wHTTemp;
-	customMatrixData* c_m;
+	mzp_t* P; // base permutation (of length new_n)
+	mzp_t* P2; // additional permutation used in advanced permutation
+	mzd_t* wHT; // transposed working matrix, used as a helper variable in the permutation
+	mzd_t* wHTTemp; // helper matrix in adv_perm to which columns are copied to
+	customMatrixData* c_m; // helper structure for gauss
 
-	// old-style master thesis structures
-	mzd_t* H; // extracted wH (real size)
-	mzd_t* HT; //transposed so we can access column as rows
-	mzd_t* botPart;
-	mzd_t* topPart;
 
-	uint32_t bucket[l_table_size*bucket_size] = {0};
+	mzd_t* H; // extracted from wH, PCM with appended syndrome but without identity part 
+	mzd_t* HT; // transposed H so we can access column as rows
+	mzd_t* botPart; // contains the lowest l rows of H
+	mzd_t* topPart; // contains the highest n-k+add_rows-l rows of H
+
+	uint32_t bucket[l_table_size*bucket_size] = {0}; // main structure of the hashmap (bucket sort)
 	//std::atomic_uint32_t counter[l_table_size];
-	uint32_t counter[l_table_size];
-	uint16_t* combs;
+	uint32_t counter[l_table_size]; // helper var for hashmap, counts the number of occurences at the given index
+	uint16_t* combs; // chase sequence, used to enumerate the vectors by adding the columns corresponding to the indices
 
 	static std::atomic_bool not_found;
 
 public:
+	// Constructor that takes the instance to solve, the previously through the config parsed blocks and optionally
+	// the chase sequence.
 	TemplateDumer(DecodingInstance& inst, const std::vector<ColumnsBlock>& blocks, uint16_t* combis =  nullptr) : TemplateBaseAlg(config, blocks, inst)
 	{
 		P = mzp_init(new_n);
@@ -191,7 +200,6 @@ public:
 		mzd_transpose(wHT, wH);
 		mzd_copy_row(wHTTemp, new_n, wHT, new_n);
 
-		// old-style master thesis structures
 		H = mzd_init(n-k+add_rows, new_n - I_size +1);
 		HT = mzd_init(H->ncols, H->nrows);
 		botPart = mzd_init(HT->nrows, l);
@@ -213,6 +221,7 @@ public:
 		mzd_free(topPart);
 	}
 
+	// Main function that runs the algorithm. Returns the number of executed loops (permutations + gauss + birthday decoding)
 	uint64_t __attribute__ ((noinline)) run() noexcept
 	{
 		uint64_t loops = 0;
@@ -220,7 +229,7 @@ public:
 
 		while(not_found)
 		{
-			
+			// permutation and gauss
 			if constexpr (use_adv_perm)
 			{
 				adv_perm();
@@ -236,6 +245,7 @@ public:
 
 			loops++;
 
+			// extraction of necessary sub-structures
 			mzd_submatrix(H, wH, 0, I_size, n-k+add_rows, new_n+1);
 			mzd_transpose(HT, H);
 			mzd_submatrix(botPart, HT, 0, I_size, HT->nrows, n-k+add_rows);
@@ -251,6 +261,8 @@ public:
 		return loops;
 	}
 
+	// Helper function to bench the runtime of the mainloop. Executes the main loop "iterations" many
+	// times and writes the runtime into the specified file. 
 	void bench_time(uint32_t iterations = 10000, std::string file_name = "TemplateDumer.txt")
 	{
 		uint32_t loops = 0;
@@ -299,6 +311,8 @@ public:
 			file << n << " " << loops << " " << duration << " " << l << " " << p << "\n";
 	}
 
+	// Helper function that executes the main loop a fixed number of iterations. Can be used to measure
+	// multi-threaded performance when class is instantiated multiple times.
 	uint32_t bench_perform_fixed_loops(uint32_t iterations = 10000)
 	{
 		uint32_t loops = 0;
@@ -333,6 +347,7 @@ public:
 	}
 
 private:
+	// Main function of birthday decoding that executes sub-steps.
 	void birthday_decoding()
 	{
 		reset_ctr();
@@ -342,16 +357,17 @@ private:
 		join_buckets();
 	}
 
+	// Resets the counter array (namely sets every entry to 0). First step of the birthday decoding.
 	void reset_ctr(){
 		//for(uint32_t idx = omp_get_thread_num(); idx < nr_combs; idx+=threads)
 		for(uint32_t i = 0;  i < l_table_size; i += threads)
 			counter[i] = 0;
 	}
 
+	// Second step of the birthday decoding. Builds L1 = H1e1+s on l bit using bucket sort.
 	void fill_buckets()
 	{
 		uint64_t syndrome = botPart->rows[new_n-I_size][0];
-		//print_bin(syndrome);
 		//for(uint32_t idx = omp_get_thread_num(); idx < nr_combs; idx+=threads)
 		for(uint32_t idx = 0; idx < nr_combs; idx += threads){
 			uint64_t tmp = syndrome;
@@ -369,6 +385,8 @@ private:
 		}
 	}
 
+	// Third and last step of the birthday decoding. Builds L2 = H2e2. It first matches on l bit and for
+	// all collisions checks the remaining n-k+add_rows-l bits.
 	void join_buckets()
 	{
 		//check each combination
@@ -429,6 +447,7 @@ private:
 		}
 	}
 
+	// Constructs solution when standard permutation is specified. Called within join_buckets.
 	void construct_solution(const uint64_t* STop, const uint64_t* xTop, const uint64_t idx_left, const uint64_t idx_right)
 	{
 		mzd_t* tmp_pre_perm = mzd_init(1, new_n);
@@ -436,6 +455,7 @@ private:
 		for(uint32_t i = 0; i < nr_top_limbs; i++)
 			tmp_pre_perm->rows[0][i] = xTop[i]^STop[i];
 
+		// set "1"s according to the indices by accessing the corresponding columns specified by the chase sequence.
 		for(uint32_t s = 0; s < p; s++)
 		{
 			uint32_t intPosLeft     = (I_size + combs[p*idx_left + s]) / 64;
@@ -457,6 +477,7 @@ private:
 		mzd_free(tmp_after_perm);
 	}
 
+	// Constructs the solution when advanced permutation is specifed. Called within join_buckets.
 	void construct_solution_adv_perm(const uint64_t* STop, const uint64_t* xTop, const uint64_t idx_left, const uint64_t idx_right)
 	{
 		// 1. Set "1" according to the indices
@@ -464,6 +485,7 @@ private:
 		for(uint32_t i = 0; i < nr_top_limbs; i++)
 			tmp_pre_perm->rows[0][i] = xTop[i]^STop[i];
 
+		// set "1"s according to the indices by accessing the corresponding columns specified by the chase sequence.
 		for(uint32_t s = 0; s < p; s++)
 		{
 			uint32_t intPosLeft     = (I_size + combs[p*idx_left + s]) / 64;
@@ -502,6 +524,8 @@ private:
 		mzd_free(tmp_final);
 	}
 
+	// Advanced permutation. Only correct if the use_adv_perm flag in the config is set to true and thus the config
+	// string is parsed accordingly. Choses a precomputed number of columns of each block for the information set.
 	void adv_perm()
 	{
 		// 1: permutation within each block to choose first nrCols from each block for the IS
@@ -540,7 +564,7 @@ private:
 		mzd_transpose(wH, wHTTemp);
 	}
 
-
+	// Helper function to print a variable in binary format.
 	template<typename T = uint64_t>
 	    requires std::is_integral_v<T>
 	void print_bin(T val){

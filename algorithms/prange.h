@@ -10,15 +10,17 @@
 #include <atomic>
 #include <chrono>
 
-
+// Config for basic (non-template) prange. Similar to ConfigTemplatePrange, for more information
+// refer to that class.
 class ConfigPrange 
 {
 public:
 
+    // instance parameter
     const uint32_t n, k, w;
     const uint32_t m4ri_k;
 
-
+    // Constructor
 	constexpr ConfigPrange(const uint32_t n,
 	                              const uint32_t k,
 	                              const uint32_t w) :
@@ -28,6 +30,7 @@ public:
                                   m4ri_k(matrix_opt_k(n - k, MATRIX_AVX_PADDING(n)))
 	{}
 
+    // Prints config information.
 	void print() const
 	{
 		std::cout << "n: " << n
@@ -38,6 +41,8 @@ public:
 	}
 };
 
+// Basic (non-template) prange. Similar to TemplatePrange, for more information
+// refer to that class.
 template<const ConfigPrange& config>
 class Prange
 {
@@ -47,10 +52,12 @@ class Prange
 	constexpr static uint32_t w = config.w;
 	constexpr static uint32_t m4ri_k = config.m4ri_k;
 
+    // instance structures
     mzd_t* H;
     mzd_t* S;
     mzd_t* e;
 
+    // permutation and working matrix
     mzp_t* P;
     mzd_t* wH;
 	mzd_t* wHT;
@@ -58,6 +65,7 @@ class Prange
 
     static std::atomic_bool not_found;
 
+    // Constructor
     Prange(DecodingInstance& I) : H(I.A), S(I.syndrome), e(I.error)
     {
         auto ST = mzd_transpose(NULL, S);
@@ -73,6 +81,7 @@ class Prange
         mzd_free(ST);
     }
 
+    // Destructor
     ~Prange()
     {
         mzp_free(P);
@@ -81,7 +90,8 @@ class Prange
         free_matrix_data(cm);
     }
 
-    uint64_t run()
+    // Main method that executes prange. Returns the number of executed loops.
+    uint64_t __attribute__ ((noinline)) run() noexcept
     {
         uint64_t loops = 0;
 
@@ -102,6 +112,8 @@ class Prange
         return loops;
     }
 
+    // Helper method to bench the algorithm. Executes "iterations" many loops and writes
+    // the runtime in the specified file.
     void bench_time(uint32_t iterations = 10000, std::string file_name = "Prange.txt")
     {
         uint32_t loops = 0;

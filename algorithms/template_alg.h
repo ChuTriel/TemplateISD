@@ -6,10 +6,11 @@
 #include <vector>
 #include <map>
 
+// A logical structure representing a block of consecutive columns (of the parity-check matrix).
 struct ColumnsBlock{
 public:
 	const int startIdx, length, weight;
-	int nrColsToChoose = 0; // restructure later to make this also const, need to adapt parseWeightString in Config
+	int nrColsToChoose = 0;
 
 	ColumnsBlock(const int startIdx,
 	             const int length,
@@ -19,7 +20,7 @@ public:
 	             weight(weight)
 	{}
 
-	// convenience method for debugging
+	// Prints the block.
 	void print() const
 	{
 		std::cout << "startIdx: " << startIdx
@@ -36,9 +37,10 @@ public:
 	// enables parity-check equations as additional rows (1 row for each non-zero block)
 	const bool enable_pce = true;
 
-	const uint32_t n, k, w;
+	const uint32_t n, k, w; // normal instance parameter
+	// template alg. parameter, additional_rows = #pce and new_n = #columns after removal of 0-weight blocks
 	const uint32_t additional_rows, new_n;
-	const uint32_t m4ri_k;
+	const uint32_t m4ri_k; // helper variable for m4ri library (gauss)
 
 	constexpr TemplateConfig(const uint32_t n,
 	                         const uint32_t k,
@@ -55,7 +57,7 @@ public:
 
 	}
 
-
+	// Prints config information.
 	virtual void print() const
 	{
 		std::cout << "Default template config: "
@@ -70,9 +72,9 @@ public:
 				<< std::endl;
 	}
 
-	// default arg should also be explicitely specified when overriding this function
-	// or: make compute_nr_cols... function protected and virtual? -> the actual parsing should be the same
-	// for each template alg. and only the number of cols chosen in each block might be different
+
+	// Returns a vector of columnsblock by parsing a given weight distribution string. Can be overridden by
+	// subclassed configs.
 	[[nodiscard]] virtual std::vector<ColumnsBlock> parse_weight_string(const std::string &eW) const
 	{
 		std::vector<ColumnsBlock> blocks;
@@ -83,8 +85,8 @@ public:
 
 protected:
 
-	// should be the same in every parse_weight_string function, derived configs can use this function as
-	// the first parsing step.
+	// Parses the weight string and fills the given vector with the parsed blocks. Should be the same 
+	// in every parse_weight_string function, derived configs can use this function as the first parsing step.
 	void parse_basic_blocks(std::vector<ColumnsBlock> &blocks, const std::string &eW) const
 	{
 		for(int i = 0; i < eW.length()-1; i++)
@@ -95,6 +97,8 @@ protected:
 			blocks.emplace_back(((int)eW.length()-1)*32, ((int)n%32 == 0) ? 32 : (int)n%32, eW.at(eW.length()-1) - '0');
 	}
 
+	// Computes a fixed number of columns for each block which are chosen as the information set.
+	// Thus function assumes the prange algorithm and the information set size to be n-k+add_rows.
 	virtual void compute_nr_nols_chosen_per_block(std::vector<ColumnsBlock> &blocks) const
 	{
 		// implicitely ordered, cannot sort a vector / array using std::sort because the ColumnsBlocks use const member...
@@ -125,10 +129,10 @@ protected:
 	}
 };
 
-//template<const class TemplateConfig& t>
+// Basic template algorithm algorithm from which one can subclass. Provides a modifed and prepared working matrix
+// using a parsed weight distribution (a vector of columnsblocks).
 class TemplateBaseAlg
 {
-	//Add steps to modify matrix and have variables (wH,...) as member vars
 public:
 	mzd_t* H; //parity-check matrix
 	mzd_t* S; //syndrome (row vector)
@@ -136,7 +140,8 @@ public:
 	mzd_t* wH; // working matrix (column-reduced, syndrome attached, parity-check rows added, padded for avx)
 	std::vector<ColumnsBlock> blocks;
 
-
+	// Constructor, takes as input the (subclassed) config, the parsed weight string as a vector of columnsblocks,
+	// and the instance to decode. 
 	TemplateBaseAlg(const TemplateConfig& config,
 	                const std::vector<ColumnsBlock>& blocks,
 	                DecodingInstance& I) : H(I.A), S(I.syndrome), e(I.error), blocks(blocks)
@@ -157,7 +162,7 @@ public:
 	}
 
 private:
-	// absolute final (reduced columns, appended rows, avx padding for gauss)
+	// Returns final matrix (reduced columns, appended rows, avx padding for gauss)
 	mzd_t* prepare_template_matrix(const TemplateConfig& c)
 	{
 		auto H_col_reduced = reduce_columns(c);
@@ -171,6 +176,7 @@ private:
 		return ret;
 	}
 
+	// Removes 0-weight blocks from parity-check matrix H and returns the column reduced matrix.
 	mzd_t* reduce_columns(const TemplateConfig& c)
 	{
 		mzd_t* HT = mzd_transpose(NULL, H);
@@ -189,6 +195,8 @@ private:
 		return HW;
 	}
 
+	// Appends the parity-check equations as additional rows using the parsed blocks and furthermore adds
+	// avx padding for the gaussian elimination. The input matrix must be of the form HRedCol | s.
 	mzd_t* append_rows_and_padding(const TemplateConfig& c, mzd_t* in)
 	{
 		ASSERT(in->ncols == (c.new_n+1)); // in = HRedCol | s
@@ -209,6 +217,8 @@ private:
 		return ret;
 	}
 protected:
+	// Maps the solution for the small, reduced instance (of size new_n) to the
+	// full solution.
 	void map_small_e_to_big_e(uint32_t newN, mzd_t* small_e)
 	{
 		int map[newN], b = 0;

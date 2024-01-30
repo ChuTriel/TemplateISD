@@ -8,31 +8,36 @@
 #include <string>
 #include <atomic>
 
+// Config for the basic (non-template) dumer. Similar to ConfigTemplateDumer, refer to that
+// config for more information about the parameter and variables.
 class ConfigDumer
 {
     public:
 
+    // instance and alg. parameter
     const uint32_t n, k, w;
-    const uint32_t p, l;
+    const uint64_t p, l;
     const uint32_t m4ri_k;
 
+    // helper variable and variables for hashmap (bucket sort)
     const uint32_t bucket_factor = 3;
     const uint32_t I_size = n-k-l;
-    const uint32_t right_size = n - I_size; // or k+l
+    const uint32_t right_size = n - I_size;
     const uint32_t right_size_half = right_size / 2;
     const uint32_t comb_half = cceil(float(right_size)/2.);
-    const uint32_t l_table_size = 1 << l;
-    const uint32_t nr_combs = bc(comb_half, p);
+    const uint64_t l_table_size = 1ull << l;
+    const uint64_t nr_combs = bc(comb_half, p);
     const uint32_t bucket_size = cceil(double(nr_combs) / double(l_table_size))*bucket_factor;
     const uint32_t nr_top_limbs = (I_size + sizeof(uint64_t)*8 -1) / (sizeof(uint64_t)*8);
     const uint32_t top_weight = w - 2*p;
     const uint32_t nr_threads;
 
+    // Constructor
     constexpr ConfigDumer(const uint32_t n,
                         const uint32_t k,
                         const uint32_t w,
-                        const uint32_t l,
-                        const uint32_t p,
+                        const uint64_t l,
+                        const uint64_t p,
                         const uint32_t nr_threads = 1) :
                         n(n),
                         k(k),
@@ -43,6 +48,7 @@ class ConfigDumer
                         m4ri_k(matrix_opt_k(n-k, MATRIX_AVX_PADDING(n)))
     {}
 
+    // Prints dumer config.
     void print() const
     {
         std::cout << "Dumer config: "
@@ -66,6 +72,8 @@ class ConfigDumer
 
 };
 
+// Basic (non-template) dumer class. Similar to TemplateDumer, for more information refer to
+// that class.
 template <const class ConfigDumer &config>
 class Dumer
 {
@@ -74,14 +82,14 @@ class Dumer
     constexpr static uint32_t n = config.n;
 	constexpr static uint32_t k = config.k;
 	constexpr static uint32_t w = config.w;
-	constexpr static uint32_t l = config.l;
-	constexpr static uint32_t p = config.p;
+	constexpr static uint64_t l = config.l;
+	constexpr static uint64_t p = config.p;
     constexpr static uint32_t m4ri_k = config.m4ri_k;
 	constexpr static uint32_t I_size = config.I_size; // was nkl
 	constexpr static uint64_t kl_half = config.right_size_half;
 	constexpr static uint64_t kl_combinations_half = config.comb_half;
-	constexpr static uint32_t l_table_size = config.l_table_size;
-	constexpr static uint32_t nr_combs = config.nr_combs;
+	constexpr static uint64_t l_table_size = config.l_table_size;
+	constexpr static uint64_t nr_combs = config.nr_combs;
 	constexpr static uint32_t bucket_size = config.bucket_size;
 	constexpr static uint32_t nr_top_limbs = config.nr_top_limbs;
 	constexpr static uint32_t top_weight = config.top_weight;
@@ -97,18 +105,20 @@ class Dumer
     customMatrixData* cm;
 
     // helper structures for birthday decoding
-    mzd_t* H; // extracted wH (real size)
-	mzd_t* HT; //transposed so we can access column as rows
+    mzd_t* H; 
+	mzd_t* HT; 
 	mzd_t* botPart;
 	mzd_t* topPart;
 
+    // hashmap (bucket sort) structures
     uint32_t bucket[l_table_size*bucket_size] = {0};
     uint32_t counter[l_table_size];
 
+    // case array and static found variable (multi-threaded purposes)
     uint16_t* combs;
     static std::atomic_bool not_found;
 
-
+    // Constructor.
     Dumer(DecodingInstance& I, uint16_t* combis = nullptr) : A(I.A), s(I.syndrome), e(I.error)
     {
         wH = matrix_init(n-k, n+1);
@@ -128,6 +138,7 @@ class Dumer
         combs = combis ? combis : ChaseManager::getInstance().get_chase_sequence(kl_combinations_half, p);
     }
 
+    // Destuctor
     ~Dumer()
     {
         mzp_free(P);
@@ -141,16 +152,19 @@ class Dumer
         mzd_free(topPart);
     }
 
-    uint64_t run()
+    // Main method that executes dumer. Returns the number of executed loops.
+    uint64_t __attribute__ ((noinline)) run() noexcept
     {
         uint64_t loops = 0;
 
         while(not_found)
         {
             loops++;
+            // permutation + gauss
             matrix_create_random_permutation(wH, wHT, P);
             matrix_echelonize_partial_plusfix(wH, m4ri_k, I_size, cm, 0, I_size, 0, P);
 
+            // extraction of neccessary structures for the birthday decoding
             mzd_submatrix(H, wH, 0, I_size, n-k, n+1);
             mzd_transpose(HT, H);
             mzd_submatrix(botPart, HT, 0, I_size, HT->nrows, n-k);
@@ -162,6 +176,8 @@ class Dumer
         return loops;
     }
 
+    // Helper method to bench the runtume. Executes "iterations" many loops and writes the
+    // runtime in the specified file.
     void bench_time(uint32_t iterations = 10000, std::string file_name = "Dumer.txt")
     {
         uint32_t loops = 0;
@@ -196,6 +212,7 @@ class Dumer
 
     private:
 
+    // Main birthday decoding method.
     void birthday_decoding()
     {
         reset_ctr();
@@ -203,12 +220,14 @@ class Dumer
         join_buckets();
     }
 
+    // Step 1: resets the counter.
     void reset_ctr()
     {
         for(int i = 0; i < l_table_size; i+=nr_threads)
             counter[i] = 0;
     }
 
+    // Step 2: builds L2=H1e1+s on l bit and sorts it implicitely by using bucket sort.
     void fill_buckets()
     {
         uint64_t syndrome = botPart->rows[n-I_size][0];
@@ -231,6 +250,8 @@ class Dumer
 
     }
 
+    // Step 3: builds L2=H2e2 and matches on l bit. If a collision is found, the remaining n-k-l bits
+    // are computed and checked for the target weight of w-2p.
     void join_buckets()
     {
         for(uint32_t idx = 0; idx < nr_combs; idx+=nr_threads)
@@ -287,6 +308,7 @@ class Dumer
 
     }
 
+    // Reconstructs the solution. It is called in join_buckets.
     void construct_solution(const uint64_t* STop, const uint64_t* xTop, const uint64_t idx_left, const uint64_t idx_right)
     {
 		mzd_t* tmp_pre_perm = mzd_init(1, n);
