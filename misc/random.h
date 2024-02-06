@@ -7,13 +7,14 @@
 
 static uint64_t random_x=123456789u, random_y=362436069u, random_z=521288629u;
 
-// Sowas von nicht sicher, Aber egal.
+// Seeds the rng.
 static void xorshf96_random_seed(uint64_t i){
 	random_x += i;
 	random_y = random_x*4095834;
 	random_z = random_x + random_y*98798234;
 }
 
+// Main function that generates a random 64bit integer.
 static uint64_t xorshf96() {          //period 2^96-1
 	uint64_t t;
 	random_x ^= random_x << 16u;
@@ -28,7 +29,7 @@ static uint64_t xorshf96() {          //period 2^96-1
 	return random_z;
 }
 
-/* n = size of buffer in bytes, */
+/* Fills a given buffer with random bytes. n = size of buffer in bytes, */
 static int xorshf96_fastrandombytes(void *buf, size_t n){
 	uint64_t *a = (uint64_t *)buf;
 
@@ -51,19 +52,22 @@ static int xorshf96_fastrandombytes(void *buf, size_t n){
 	return 0;
 }
 
-/* n = bytes. */
+// Wrapper function for xorshf96_fastrandombytes that takes an array (pointer)
+// of type uint64_t instead of void as an input because the main function generates
+// always random 64bit words.  n = size of buffer in bytes.
 inline static int xorshf96_fastrandombytes_uint64_array(uint64_t *buf, size_t n){
 	void *a = (void *)buf;
 	xorshf96_fastrandombytes(a, n);
 	return 0;
 }
 
+// Wrapper function for xorshf96.
 static uint64_t xorshf96_fastrandombytes_uint64() {
 	return xorshf96();
 }
 
 /*
-pgc
+pgc (permuted congruential generator?)
 */
 
 struct pcg_state_setseq_64 {    // Internals are *Private*.
@@ -252,26 +256,32 @@ uint64_t xoroshiro128_random_lim(uint64_t limit, uint64_t *S0, uint64_t *S1) noe
 	return retval;
 }
 
+/**
+ * FINAL WRAPPER FUNCTIONS FOR SEEDING AND NUMBER GENERATION. HERE ONE CAN CHOOSE BETWEEN
+ * xorshf96, pcg, and xoroshiro128.
+*/
+
 /*
- *  Final wrapper function. Can easily be replaced with whatever function you want
+ *  Final wrapper function. Can easily be replaced with whatever function you want.
  */
 static int fastrandombytes(void *buf, size_t n) noexcept {
 	return xorshf96_fastrandombytes(buf, n);
 }
 
-///
+/// Wrapper function that seeds the chosen rng (Probably always xorshf96).
 /// \param i
 static void random_seed(uint64_t i) noexcept {
 	xorshf96_random_seed(i);
 }
 
-///
+/// Final wrapper function that generates a random 64bit integer with the chosen rng
+/// (prabably always xorshf96).
 /// \return
 static uint64_t fastrandombytes_uint64() noexcept {
 	return xorshf96_fastrandombytes_uint64();
 }
 
-/// creates a weight w uint64_t
+/// Creates a weight w uint64_t.
 /// \param w
 /// \return
 template<typename T>
@@ -294,10 +304,10 @@ static T fastrandombytes_weighted(const uint32_t w) noexcept {
 	return ret;
 }
 
-///
-/// \tparam T
-/// \tparam bits
-/// \return
+/// Generates random bits and returns them in the specified type T.
+/// \tparam T - The type in which the bits are returned in.
+/// \tparam bits - The number of bits to generate.
+/// \return The integer-type in which the bits are stored.
 template<typename T, const uint32_t bits>
 static inline T fastrandombits() noexcept {
 	constexpr uint32_t Tbits = sizeof(T)*8;

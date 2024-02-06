@@ -3,28 +3,34 @@
 
 #include <map>
 
+// Helper class that generates and stores chase sequences.
+// Implemented as a singleton.
 class ChaseManager
 {
-	using T = uint16_t;
+	using T = uint16_t; // base type of the chase sequence(s).
 	typedef std::pair<int, int> Key;
 	typedef std::map<Key, T*> Map;
 public:
+	// Disable certain constructors and (assign) operators.
 	ChaseManager(const ChaseManager&) = delete; //copy
 	ChaseManager(ChaseManager&&) = delete; //move
 	ChaseManager& operator=(const ChaseManager&) = delete;
 	ChaseManager& operator=(ChaseManager&&) = delete;
 
+	// Returns the singleton instance.
 	static ChaseManager& getInstance(){
-		//created when used the first time, otherwise, if member var, it needs to be declared somewhere and instantiated
+		// created when used the first time
 		// this object lives until the program's termination
 		static ChaseManager instance;
 		return instance;
 	}
 
-	//perhaps a pair with size and pointer to array? Or funky C-style by adding an additional output parameter?
+	// Main function that generates n over p combinations as a chase sequence in the form:
+	// (10, 2): [0, 1, 0, 2, 0, 3, ..., 0, 9, 1, 2, 1, 3, ....] -> n over p many p-tuples.
+	// Access the i-th element of the j-th combination via [j*p + i].
+	// Returns the start pointer to the combinations array.
 	T* get_chase_sequence(int nn, int pp)
 	{
-		//std::cout << "Doing stuff for key: (" << nn << ", " << pp << ")" << std::endl;
 		Key key(nn, pp);
 		if(map.contains(key))
 			return map[key];
@@ -37,6 +43,7 @@ public:
 		return combs;
 	}
 
+	// Returns the binomial coefficient n over k.
 	uint64_t bin_coeff(uint64_t nn, uint64_t kk) noexcept
 	{
 		return

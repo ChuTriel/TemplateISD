@@ -5,6 +5,7 @@
 #include <cstdint>
 #include "helper.h"
 #include "m4ri/m4ri.h"
+#include "custom_matrix.h"
 
 
 // problem instance for the algorithm.
@@ -27,6 +28,7 @@ public:
 				  << std::endl;
 	}
 
+	// checks if the set error vector results in the syndrome. Returns true if He=s, false otherwise.
 	bool check() {
 		mzd_t *ss_tmp = mzd_init(syndrome->ncols, syndrome->nrows);
 		mzd_t *ss_tmp_T = mzd_init(syndrome->nrows, syndrome->ncols);
@@ -40,9 +42,9 @@ public:
 		mzd_mul_naive(ss_tmp, A, ee_T);
 		mzd_transpose(ss_tmp_T, ss_tmp);
 
-//		print_matrix("FINAL  e: ", error);
-//		print_matrix("SHOULD s: ", syndrome);
-//		print_matrix("IS     s:", ss_tmp_T);
+		print_matrix("FINAL  e: ", error);
+		print_matrix("SHOULD s: ", syndrome);
+		print_matrix("IS     s:", ss_tmp_T);
 
 		for (uint32_t i = 0; i < n-k; ++i) {
 			if (mzd_read_bit(syndrome, 0, i) != mzd_read_bit(ss_tmp, i, 0)) {
@@ -57,6 +59,7 @@ public:
 		return ret;
 	}
 
+	// Constructor.
 	DecodingInstance(
 			const char *H,
 			const char *S,
@@ -71,6 +74,7 @@ public:
 		error = mzd_init(1, n);
 	}
 
+	// Destructor.
 	~DecodingInstance() {
 		mzd_free(syndrome);
 		mzd_free(syndromeT);
