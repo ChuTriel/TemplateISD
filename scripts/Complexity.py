@@ -33,7 +33,7 @@ def parseWeightString(inst: ReducedInstance, pce = True):
     for i in range(len(weightString)-1):
         if weightString[i] != "0":
             ret.append(ColumnsBlock(i*32, 32, int(weightString[i])))
-    
+
     m = 32 if inst.n%32 == 0 else inst.n%32
 
     if weightString[-1:] != "0":
@@ -53,7 +53,7 @@ def parseWeightString(inst: ReducedInstance, pce = True):
         block.nrCols = res
         sum += res
         tupleList.append([resF-res, block])
-    
+
     # for b in ret:
     #     b.print()
 
@@ -69,7 +69,7 @@ def parseWeightString(inst: ReducedInstance, pce = True):
                 break
 
     # for b in ret:
-    #     b.print()    
+    #     b.print()
 
     return ret
 
@@ -96,7 +96,7 @@ def prangeComplexityRandomPerm(inst: Instance, log = True, pce = True):
     return ret
 
 # Computes the number of expected permutations for prange for a given actual ReducedInstance.
-# Uses a better permutation by taking the weights of the blocks into consideration. 
+# Uses a better permutation by taking the weights of the blocks into consideration.
 def prangeComplexitySpecialPerm(inst: ReducedInstance, log = True, pce = True):
     blocks = parseWeightString(inst, pce)
     exp_perm = 1.0
@@ -420,7 +420,8 @@ if __name__ == '__main__':
     # prangeComplexitySpecialPerm(inst240R)
     # prangeComplexitySpecialPerm(inst1041R)
 
-    print(prangeComplexityRandomPerm(inst156, log = False, pce = True))
-    print(prangeComplexityRandomPerm(inst156R, log = False, pce = False))
-    print(prangeComplexitySpecialPerm(inst156R, log = False, pce = True))
-    print(prangeComplexitySpecialPerm(inst156R, log = False, pce = False))
+    print(prangeComplexitySpecialPerm(inst2197R, log = True, pce = False))
+    # print(prangeComplexityRandomPerm(inst2197, log = True, pce = True))
+    # print(prangeComplexityRandomPerm(inst2197R, log = True, pce = False))
+    # print(prangeComplexitySpecialPerm(inst2197R, log = True, pce = True))
+    # print(prangeComplexitySpecialPerm(inst2197R, log = True, pce = False))

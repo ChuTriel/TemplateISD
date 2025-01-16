@@ -1,10 +1,10 @@
 #ifndef SMALLSECRETLWE_CUSTOM_MATRIX_H
 #define SMALLSECRETLWE_CUSTOM_MATRIX_H
 
-#ifdef __APPLE__
-#include <boost/align/aligned_alloc.hpp>
-using boost::alignment::aligned_alloc;
-#endif
+//#ifdef __APPLE__
+//#include <boost/align/aligned_alloc.hpp>
+//using boost::alignment::aligned_alloc;
+//#endif
 
 #include "m4ri/m4ri.h"
 #include "m4ri/mzd.h"

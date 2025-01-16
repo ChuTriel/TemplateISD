@@ -16,7 +16,7 @@ class Instance:
         print("n: {}, k: {}, w: {}, ncols: {}, nrows: {}".format(self.n, self.k, self.w, self.ncols, self.nrows))
 
 class ReducedInstance(Instance):
-    
+
     def __init__(self, n, k, w, newN, addRows, weightDistro = ""):
         Instance.__init__(self, n, k, w)
         self.isReduced = True
@@ -115,7 +115,7 @@ MapFromNToTemplateInstance = {
     1665: inst1665R,
     1995: inst1995R,
     2129: inst2129R,
-    2197: inst2197R2, #inst2197R,
+    2197: inst2197R, #inst2197R,
     2265: inst2265R,
     2472: inst2472R,
     3488: inst3488R

@@ -28,7 +28,7 @@ endif()
 # endif()
 
 
-set(OPTIMIZE_FLAGS "-g -march=native -O3 -DNDEBUG -ffast-math -ftree-vectorize -funroll-loops -fno-exceptions ${AVX2_FLAGS} ${AVX512_FLAGS}")
+set(OPTIMIZE_FLAGS "-g -O3 -DNDEBUG -ffast-math -ftree-vectorize -funroll-loops -fno-exceptions ${AVX2_FLAGS} ${AVX512_FLAGS}")
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${OPTIMIZE_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${OPTIMIZE_FLAGS}")
@@ -39,6 +39,13 @@ include_directories("challenges/*")
 include_directories("deps/m4ri")
 include_directories("algorithms")
 include_directories("misc")
+
+if(APPLE)
+    include_directories(/opt/homebrew/opt/libomp/include)
+    include_directories(/opt/homebrew/include)
+    link_directories(/opt/homebrew/opt/libomp/lib)
+    link_directories(/opt/homebrew/lib)
+endif()
 
 # original, single threaded (working) template prange
 add_executable(main main.cpp)
