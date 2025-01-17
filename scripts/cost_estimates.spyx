@@ -1,0 +1,419 @@
+# ----------------------------------------------------------------------- #
+# How to Lose Some Weight - A Practical Template Syndrome Decoding Attack #
+#           code for recreating Tab. 1: the cost estimates                #
+# ----------------------------------------------------------------------- #
+
+import numpy as np
+from scipy.special import binom
+from libc.math cimport floor, ceil, round
+import sage.all as sage
+
+
+def get_wset_random(int n, int w, long[:] bvec):
+    """
+        generate template {w_i}_i for a random error vector
+    """
+    cdef:
+        int i, j
+        int i_start = 0
+        int m = bvec.shape[0]
+        long[:] wset = np.zeros(m, dtype = np.int64)
+        long[:] evec = np.zeros(n, dtype = np.int64)
+
+    # sample random error vector of weight w
+    for i in range(w):
+        evec[i] = 1
+
+    evec = np.random.permutation(evec)
+
+    # determine weights of blocks
+    for j in range(m):
+        for i in range(bvec[j]):
+            if evec[i_start+i]: 
+                wset[j] += 1
+        i_start += bvec[j]
+
+    return np.asarray(wset)
+
+
+
+
+def col_perm(int k, long[:] wset, long[:] bvec, int proportional):
+    """
+        gives permutation for template ISD
+
+        proportional: use proportional assignment, else use greedy approach
+    """
+    cdef:
+        int j, iter, niter
+        int m = bvec.shape[0]
+        double w = np.sum(wset)
+        int n = np.sum(bvec)
+        double codim = <double> (n-k)
+        long[:]    iset       = np.zeros(m, dtype = np.int64)
+        long[:]    perm       = np.zeros(m, dtype = np.int64)
+        double[:]  delta      = np.zeros(m, dtype = np.double)
+        double[:] improvement = np.zeros(m, dtype = np.double)
+
+    if proportional:
+        for j in range(m):
+            iset[j]  = max(bvec[j]-<long>floor(codim*wset[j]/w), 0)
+            delta[j] = iset[j] - max(bvec[j]-(codim*wset[j]/w), 0)
+
+        assert np.sum(iset) >= k, "iset too small"
+
+        perm = np.argsort(delta)[::-1]
+        while np.sum(iset) > k:
+            for j in range(m):
+                if np.sum(iset) == k:
+                    break
+                if iset[perm[j]] > 0:
+                    iset[perm[j]] -= 1
+
+    else:
+        # initial iset
+        for j in range(m):
+            iset[j] = bvec[j] - wset[j]
+
+            if iset[j] > 0: 
+                improvement[j] = -np.log2( 1-wset[j]/(bvec[j]-iset[j]+1) ) 
+
+        # greeday distribution
+        niter = np.sum(iset)-k
+        for iter in range(niter):
+            j = np.argmax(improvement)
+            iset[j] -= 1
+            if iset[j]:   improvement[j] = -np.log2( 1-wset[j]/(bvec[j]-iset[j]+1) ) 
+            else:         improvement[j] = 0.0
+    
+    assert np.sum(iset) == k
+    return np.asarray(iset)
+
+
+
+def count_iters(long[:] iset, long[:] wset, long[:] bvec, int pmax):
+    """
+    calculate probability of 0 <= p <= pmax errors in small instance
+    """
+    cdef:
+        int p, pcur, i
+        int m = bvec.shape[0]
+        long[:] rset = np.zeros(m, dtype = np.int64)
+        double[:,:] comb_tab = np.zeros([pmax+1, m], dtype = np.double)
+        double combs
+        double[:] iters = np.zeros(pmax+1, dtype = np.double)
+
+    for i in range(m):
+        rset[i] = bvec[i] - iset[i]
+
+    # first column of table
+    i = 0
+    for pcur in range(min(rset[i], wset[i], pmax) +1): 
+        combs = binom(iset[i], pcur) * binom(rset[i], wset[i]-pcur ) / binom(bvec[i], wset[i])
+        comb_tab[pcur,i] =combs
+
+    # fill remaining table
+    for i in range(1,m):
+        for pcur in range(min(iset[i], wset[i], pmax) +1):
+            # probability that current step adds weight pcur
+            combs = binom(iset[i], pcur) * binom(rset[i], wset[i]-pcur ) / binom(bvec[i], wset[i])
+
+
+            for p in range(0, pmax-pcur+1):
+                comb_tab[p+pcur,i] = comb_tab[p+pcur,i] + comb_tab[p,i-1] * combs
+
+
+    for pcur in range(pmax+1):
+        iters[pcur] = -np.log2(comb_tab[pcur,m-1])
+
+
+    return np.asarray(iters)
+
+def optimize_m4ri(int n, int k):
+    """
+    helper function for determining the complexity of Gaussian Elemination.
+    Borrowed from https://github.com/Crypto-TII/CryptographicEstimators/blob/main/cryptographic_estimators/SDEstimator/sd_helper.py
+    """
+
+    (r, v) = (0, 10^100)
+    for i in range(min(n - k,30)):
+        #print(i, np.log2(gauss_complexity(n, k, i)), gauss_complexity(n, k, i))
+        tmp = np.log2(gauss_complexity(n, k, i))
+        if v > tmp:
+            r = i
+            v = tmp
+
+    assert r <29,"maybe larger r needed!"
+    return r
+
+def gauss_complexity(int n, int k, int r):
+    """
+    Complexity of Gaussain Elimination
+    """
+    if r != 0:
+        return <double>((r ** 2 + 2 ** r + (n - k - r)) * int(((n + r - 1) / r)))
+    return <double>((n - k) ** 2)
+
+
+def optimize_ISD(int n, int k, int w, double Titer = 0.0, int bitOps = 0):
+    """
+    optimize the performance of standard ISD by picking p, ell optimally 
+
+    input:
+        n:              code lenght
+        k:              code dimension
+        w:              error weight
+        Titer:          time per iteration in log seconds
+        bitOps:         if 0: in log seconds
+                        if 1: in binary operations
+
+    output:
+        C_Dumer:        estimated ISD cost, in log seconds, or (if bitOps == 1) in binary operations
+        p_best:         optimal value for p
+        ell_best:       optimal value for ell
+    """
+
+    C_Dumer = 10**100
+
+    for p in range(15):
+        C_Dumer_p = 10**100 # optimal cost for this p
+
+
+        ell = 0
+
+        while True:
+            #print(f'ell={ell},p={p}')
+            C_Dumer_ell_p = benchmark_ISD(n, k, w, ell,p, Titer , bitOps)
+            if C_Dumer_ell_p < C_Dumer_p:
+                C_Dumer_p = C_Dumer_ell_p
+                p_opt = p
+                ell_opt = ell
+                ell += 1
+
+                if ell > n-k:
+                    break
+            else:
+                break
+
+        #print(f'n = {n}, p={p}: C_Dumer = {C_Dumer_p} using ell={ell_opt}')
+
+        if C_Dumer_p < C_Dumer:
+            C_Dumer  = C_Dumer_p
+            ell_best = ell_opt
+            p_best   = p_opt
+    
+    return C_Dumer, p_best, ell_best
+
+def benchmark_ISD(int n, int k, int w, int ell, int p, double Titer = 0.0, int bitOps = 0):
+    """
+    benchmark the performance of standard ISD
+
+    input:
+        n:              code lenght
+        k:              code dimension
+        w:              error weight
+        ell:            parameter of PGE, Prange uses ell = 0
+        P:              weight on small instance, 
+        Titer:          time per iteration in log seconds
+        bitOps:         if 0: in log seconds
+                        if 1: in binary operations
+
+    output:
+        T_ISD:          estimated ISD cost, in log seconds, or (if bitOps == 1) in binary operations
+    """
+    cdef:
+        double N_split  = np.log2(binom(k+ell,2*p)) - np.log2(binom(floor((k+ell)/2),p)) -np.log2(binom(ceil((k+ell)/2),p)) # in log2 units
+        double N_weight = np.log2(binom(n,w)) - np.log2(binom(k + ell, 2*p)) - np.log2(binom(n-k-ell, w-2*p))               # in log2 units
+        double T_ISD    = N_weight + N_split + Titer
+
+    if bitOps:
+        r       = optimize_m4ri(n, k)
+        T_GE    = gauss_complexity(n, k, r)
+        L1      = binom(floor((k+ell)/2),p)
+        L2      = binom(ceil((k+ell)/2),p)
+        T_ISD   = N_weight + N_split + np.log2(T_GE + L1 + L2 + 2**(np.log2(L1)+np.log2(L2)-ell) ) + np.log2(n)
+
+    else:
+        T_ISD    = N_weight + N_split + Titer
+
+    #print(f'({n},{T_ISD})')
+    return T_ISD
+
+
+def optimize_template_ISD(int n, int k, int w, int niter, int bmax, int useChecks = 1, int advPerm = 1, int proportional = 1, double Titer = 0.0, int bitOps = 0):
+    """
+    optimize the performance of template ISD by picking p, ell
+    combines a given time per iteration T with an avg number of required iterations
+
+    input:
+        n:              code lenght
+        k:              code dimension
+        w:              error weight
+        niter:          number of iteration for averaging over templates
+        bmax:           block size, typically 32
+        useChecks:      append additional checks to PCM
+        advPerm:        use advanced permutation
+        proportional:   use simple proportional assignment
+        Titer:          time per iteration in log seconds
+        bitOps:         if 0: in log seconds
+                        if 1: in binary operations
+    
+    output:
+        T_ISD:          estimated ISD cost, in log seconds, or (if bitOps == 1) in binary operations
+    """
+    C_TDumer = 10**100
+
+    for p in range(5):
+        C_TDumer_p = 10**100 # optimal cost for this p
+
+
+        ell = 0
+
+        while True:
+            C_TDumer_ell_p = benchmark_template_ISD(n, k, w, niter, ell, p, bmax, useChecks, advPerm, proportional, Titer, bitOps)
+            if C_TDumer_ell_p > C_TDumer_p + 4: # make robust against variance
+                    break
+            else:
+                if C_TDumer_ell_p < C_TDumer_p:
+                    C_TDumer_p = C_TDumer_ell_p
+                    p_opt = p
+                    ell_opt = ell
+
+                ell += 1
+
+                if ell > min(n-k,100):
+                    break
+
+        print(f'n = {n}, p={p}: C_Dumer = {C_TDumer_p} using ell={ell_opt}')
+
+        if C_TDumer_p < C_TDumer:
+            C_TDumer  = C_TDumer_p
+            ell_best = ell_opt
+            p_best   = p_opt
+    
+    return C_TDumer, p_best, ell_best
+
+def benchmark_template_ISD(int n, int k, int w, int niter, int ell, int p, int bmax, int useChecks = 1, int advPerm = 1, int proportional = 1, double Titer = 0.0, int bitOps = 0):
+    """
+    benchmark the performance of template ISD:
+    combines a given time per iteration T with an avg number of required iterations
+
+    input:
+        n:              code lenght
+        k:              code dimension
+        w:              error weight
+        niter:          number of iteration for averaging over templates
+        ell:            parameter of PGE, Prange uses ell = 0
+        P:              weight on small instance, 
+        bmax:           block size, typically 32
+        useChecks:      append additional checks to PCM
+        advPerm:        use advanced permutation
+        proportional:   use simple proportional assignment
+        Titer:          time per iteration in log seconds
+        bitOps:         if 0: in log seconds
+                        if 1: in binary operations
+    
+    output:
+        T_ISD:          estimated ISD cost, in log seconds, or (if bitOps == 1) in binary operations
+    """
+    cdef:
+        int i, j, iter
+        int kcur, mcur
+        int m, b_last
+
+        double N_weight, N_split
+        double T_TemplateISD
+        double Exp_T = 0.0
+        double Exp_N_iter = 0.0
+        double Exp_C_iter = 0.0
+
+    m = <int>floor(n/bmax)
+    b_last = bmax
+
+    if n > bmax*m:
+        # last block has smaller size
+        b_last = n - m*bmax
+        m += 1
+
+    cdef:
+        long[:] bvec = np.zeros(m, dtype = np.int64)
+        long[:] wset = np.zeros(m, dtype = np.int64)
+        long[:] iset = np.zeros(m, dtype = np.int64)
+
+    for j in range(m-1):
+        bvec[j] = bmax
+    bvec[m-1] = b_last
+
+    assert  np.sum(bvec) == n, "len does not sum up"
+
+
+    for iter in range(niter):
+    
+        # generate random template
+        wset = get_wset_random(n, w, bvec)
+
+        # wset as used in experiments n=2197
+        #wset = np.asarray([0,1,0,0,0,1,0,0,1,0,1,0,1,0,0,0,0,0,2,0,2,0,0,0,0,1,0,0,0,2,0,0,1,2,1,0,1,1,1,1,0,1,0,0,0,0,1,0,0,0,0,0,1,1,1,2,0,1,1,0,2,0,2,1,1,0,0,2,0], dtype = np.int64)
+
+    
+        # count number of nonzero blocks
+        # remove zero blocks completely
+        ncur = n
+        kcur = k
+        mcur = m
+
+        for j in range(m):
+            if wset[j]:
+                # use additional check
+                if useChecks: kcur -= 1
+            else:
+                ncur -= bvec[j]
+                kcur -= bvec[j]
+                mcur -= 1
+
+        # template and blocksizes of modified instance without zero-blocks
+        wset_cur = np.zeros(mcur, dtype = np.int64)
+        bvec_cur = np.zeros(mcur, dtype = np.int64)
+        i = 0
+        for j in range(m):
+            if wset[j]:
+                wset_cur[i] = wset[j]
+                bvec_cur[i] = bvec[j]
+                i += 1
+
+        if  advPerm:
+            # determine suitable column permutation
+            iset_cur = col_perm(kcur+ell, wset_cur, bvec_cur, proportional)
+
+            # required iterations to achieve weight 2*p on small instance
+            N_weight = count_iters(iset_cur, wset_cur, bvec_cur, 2*p)[2*p]
+        else:
+            N_weight = np.log2(binom(ncur,w)) - np.log2(binom(kcur + ell, 2*p)) - np.log2(binom(ncur-kcur-ell, w-2*p))
+
+        # required iterations to achieve even split in small instance
+        N_split  = np.log2(binom(kcur+ell,2*p)) - np.log2(binom(floor((kcur+ell)/2),p)) -np.log2(binom(ceil((kcur+ell)/2),p))
+
+        if bitOps: # estimate in binary operations
+            r       = optimize_m4ri(ncur, kcur)
+            T_GE    = gauss_complexity(ncur, kcur, r)
+            L1      = binom(floor((kcur+ell)/2),p)
+            L2      =  binom(ceil((kcur+ell)/2),p)
+
+            C_iter = np.log2(T_GE + L1 + L2 + 2**(np.log2(L1)+np.log2(L2)-ell) )
+           
+            T_TemplateISD   = N_weight + N_split + C_iter + np.log2(ncur)
+
+            Exp_N_iter += (N_weight + N_split)/niter
+            Exp_C_iter +=  np.log2(L1 + L2 + 2**(np.log2(L1)+np.log2(L2)-ell) )/niter
+            #print(f'{N_weight}, {N_split}, {T_GE}, {T_TemplateISD}')
+        else: # overall time required using benchmarked input
+            T_TemplateISD    = N_weight + N_split + Titer
+
+        
+        #print(f'{N_weight}, {N_split}, {Titer}, {T_TemplateISD}')
+
+        Exp_T += T_TemplateISD/niter
+
+
+    print(f'({n}: {Exp_T}, {Exp_N_iter}, {Exp_C_iter})')
+    return Exp_T
